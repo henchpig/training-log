@@ -1000,7 +1000,12 @@ function esc(s){return(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt
 function stimLbl(s){return{strength:'Strength',power:'Power',power_endurance:'P-End.',capacity:'Capacity',rehab:'Rehab'}[s]||s;}
 
 var GRADE_SEQ=['5.6','5.7','5.8','5.9','5.10a','5.10b','5.10c','5.10d','5.11a','5.11b','5.11c','5.11d','5.12a','5.12b','5.12c','5.12d','5.13a','5.13b','5.13c','5.13d','5.14a','5.14b','5.14c','5.14d'];
-function gradeNum(g){if(!g)return 0;var s=g.toString().trim();var y=s.match(/^5\.(\d+)([a-d]?)$/i);if(y){return parseInt(y[1])*4+({'':'0','a':'0','b':'1','c':'2','d':'3'}[y[2].toLowerCase()]||0);}var v=s.match(/^[vV](\d+)$/);if(v)return parseInt(v[1])+200;return{'6a':300,'6a+':301,'6b':302,'6b+':303,'6c':304,'6c+':305,'7a':306,'7a+':307,'7b':308,'8a':312}[s.toLowerCase()]||0;}
+function gradeNum(g){if(!g)return 0;var s=g.toString().trim();
+  // handle shorthand like '12c' -> '5.12c'
+  if(s.match(/^(10|11|12|13|14)[a-d]?$/i))s='5.'+s;
+  var y=s.match(/^5\.(\d+)([a-d]?)$/i);if(y){return parseInt(y[1])*4+({'':'0','a':'0','b':'1','c':'2','d':'3'}[y[2].toLowerCase()]||0);}
+  var v=s.match(/^[vV](\d+)$/);if(v)return parseInt(v[1])+200;
+  return{'6a':300,'6a+':301,'6b':302,'6b+':303,'6c':304,'6c+':305,'7a':306,'7a+':307,'7b':308,'8a':312}[s.toLowerCase()]||0;}
 function numToGrade(n){var yds=GRADE_SEQ.find(function(g){return gradeNum(g)===Math.round(n);});return yds||String(n);}
 function primVal(s,t){if(t==='lifting'||t==='finger_training')return parseFloat(s.load)||null;if(t==='climbing'||t==='endurance_laps')return gradeNum(s.grade)||null;if(t==='cardio')return parseFloat(s.duration_min)||null;return null;}
 function fmtCompact(s,t){
