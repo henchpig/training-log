@@ -935,6 +935,7 @@ async function loadPyramid(){
     var cat=e.category;
     if(!cat){var ex=S.exercises.find(function(x){return x.id===e.exercise_id;});cat=ex?ex.category:null;}
     console.log('set:', s.grade, s.result, 'cat:', cat);
+    console.log('set grade:', s.grade, 'converted:', gradeNum(s.grade), 'result:', s.result, 'cat:', cat);
     if(s.result!=='sent'&&s.result!=='flash'&&s.result!=='complete')return;
     if(!s.grade)return;
     if(cat==='rope'||cat==='boulder')indoor.push(s.grade);
