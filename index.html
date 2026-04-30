@@ -818,7 +818,6 @@ async function loadChart(){
   var{data:ents}=await sb.from('entries').select('id,sessions(date)').eq('exercise_id',S.selEx).eq('user_id',user.id);
   if(!ents||!ents.length){document.getElementById('prog-empty').style.display='block';return;}
   var{data:sets}=await sb.from('sets').select('*').in('entry_id',ents.map(function(e){return e.id;}));
-  console.log('em keys:', Object.keys(em));
   var em={};ents.forEach(function(e){em[e.id]=e;});
 
   // For bouldering/climbing — scatter by grade and result
@@ -925,25 +924,27 @@ function calcTrend(vals){var n=vals.length,ym=vals.reduce(function(a,b){return a
 // ── PYRAMID ───────────────────────────────────────────────────
 async function loadPyramid(){
   var{data:ents,error:e1}=await sb.from('entries').select('id,category,exercise_id,sessions(date)').eq('user_id',user.id).in('exercise_type',['climbing','endurance_laps']);
-  console.log('pyramid ents:', ents, 'error:', e1);
+  console.log('PYRAMID A ents:',ents?.length,'error:',e1);
   if(!ents||!ents.length){S.pyramidSends={indoor:[],outdoor:[]};renderPyramids();return;}
-  var{data:sets,error:e2}=await sb.from('sets').select('grade,result,entry_id').in('entry_id',ents.map(function(e){return e.id;}));
-  console.log('pyramid sets:', sets, 'error:', e2);
-  console.log('em keys:', Object.keys(em));
+  var eids=ents.map(function(e){return e.id;});
+  var{data:sets,error:e2}=await sb.from('sets').select('grade,result,entry_id').in('entry_id',eids);
+  console.log('PYRAMID B sets:',sets?.length,'error:',e2);
   var em={};ents.forEach(function(e){em[e.id]=e;});
+  console.log('PYRAMID C em keys:',Object.keys(em));
   var indoor=[],outdoor=[];
   (sets||[]).forEach(function(s){
+    console.log('PYRAMID D set:',s.grade,s.result,em[s.entry_id]?.category);
     var e=em[s.entry_id];if(!e)return;
     var cat=e.category;
     if(!cat){var ex=S.exercises.find(function(x){return x.id===e.exercise_id;});cat=ex?ex.category:null;}
-    console.log('set:', s.grade, s.result, 'cat:', cat);
-    console.log('set grade:', s.grade, 'converted:', gradeNum(s.grade), 'result:', s.result, 'cat:', cat);
     if(s.result!=='sent'&&s.result!=='flash'&&s.result!=='complete')return;
     if(!s.grade)return;
-    if(cat==='rope'||cat==='boulder')indoor.push(s.grade);
-    else if(cat==='outdoor')outdoor.push(s.grade);
+    var g=s.grade.toString().trim();
+    if(g.match(/^(10|11|12|13|14)[a-d]?$/i))g='5.'+g;
+    if(cat==='rope'||cat==='boulder')indoor.push(g);
+    else if(cat==='outdoor')outdoor.push(g);
   });
-  console.log('indoor sends:', indoor, 'outdoor:', outdoor);
+  console.log('PYRAMID E indoor:',indoor,'outdoor:',outdoor);
   S.pyramidSends={indoor,outdoor};
   renderPyramids();
 }
