@@ -387,7 +387,7 @@ var S = {
   editSessionId:null,
   progCatFilter:'', progSearch:'',
   histCatFilter:'',
-  pyramidSends:[]
+  pyramidSends:[], pyrIndoor:'', pyrOutdoor:''
 };
 
 var CAT_TYPE = {conditioning:'lifting',finger_training:'finger_training',rope:'climbing',boulder:'climbing',outdoor:'climbing',cardio:'cardio'};
@@ -923,11 +923,13 @@ function calcTrend(vals){var n=vals.length,ym=vals.reduce(function(a,b){return a
 
 // ── PYRAMID ───────────────────────────────────────────────────
 async function loadPyramid(){
-  // Load saved targets
+  // Load saved targets into state first
   var settResp=await sb.from('user_settings').select('pyramid_indoor_target,pyramid_outdoor_target').eq('user_id',user.id).single();
   if(settResp.data){
-    if(settResp.data.pyramid_indoor_target)document.getElementById('pyr-indoor-target').value=settResp.data.pyramid_indoor_target;
-    if(settResp.data.pyramid_outdoor_target)document.getElementById('pyr-outdoor-target').value=settResp.data.pyramid_outdoor_target;
+    S.pyrIndoor=settResp.data.pyramid_indoor_target||'';
+    S.pyrOutdoor=settResp.data.pyramid_outdoor_target||'';
+    document.getElementById('pyr-indoor-target').value=S.pyrIndoor;
+    document.getElementById('pyr-outdoor-target').value=S.pyrOutdoor;
   }
   // Fetch sends
   var pyrEntsResp=await sb.from('entries').select('id,category,exercise_id,sessions(date)').eq('user_id',user.id).in('exercise_type',['climbing','endurance_laps']);
@@ -954,15 +956,17 @@ async function loadPyramid(){
 }
 
 async function savePyramidTargets(){
-  var indoor=document.getElementById('pyr-indoor-target').value.trim();
-  var outdoor=document.getElementById('pyr-outdoor-target').value.trim();
-  await sb.from('user_settings').upsert({user_id:user.id,pyramid_indoor_target:indoor,pyramid_outdoor_target:outdoor},{onConflict:'user_id'});
+  S.pyrIndoor=document.getElementById('pyr-indoor-target').value.trim();
+  S.pyrOutdoor=document.getElementById('pyr-outdoor-target').value.trim();
+  await sb.from('user_settings').upsert({user_id:user.id,pyramid_indoor_target:S.pyrIndoor,pyramid_outdoor_target:S.pyrOutdoor},{onConflict:'user_id'});
   renderPyramids();
 }
 
 function renderPyramids(){
-  var iTarget=document.getElementById('pyr-indoor-target').value.trim();
-  var oTarget=document.getElementById('pyr-outdoor-target').value.trim();
+  var iTarget=(document.getElementById('pyr-indoor-target')?.value||S.pyrIndoor||'').trim();
+  var oTarget=(document.getElementById('pyr-outdoor-target')?.value||S.pyrOutdoor||'').trim();
+  if(document.getElementById('pyr-indoor-target'))document.getElementById('pyr-indoor-target').value=iTarget;
+  if(document.getElementById('pyr-outdoor-target'))document.getElementById('pyr-outdoor-target').value=oTarget;
   renderOnePyramid('pyr-indoor',iTarget,S.pyramidSends?.indoor||[]);
   renderOnePyramid('pyr-outdoor',oTarget,S.pyramidSends?.outdoor||[]);
 }
