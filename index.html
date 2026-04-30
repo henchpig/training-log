@@ -818,6 +818,7 @@ async function loadChart(){
   var{data:ents}=await sb.from('entries').select('id,sessions(date)').eq('exercise_id',S.selEx).eq('user_id',user.id);
   if(!ents||!ents.length){document.getElementById('prog-empty').style.display='block';return;}
   var{data:sets}=await sb.from('sets').select('*').in('entry_id',ents.map(function(e){return e.id;}));
+  console.log('em keys:', Object.keys(em));
   var em={};ents.forEach(function(e){em[e.id]=e;});
 
   // For bouldering/climbing — scatter by grade and result
@@ -928,6 +929,7 @@ async function loadPyramid(){
   if(!ents||!ents.length){S.pyramidSends={indoor:[],outdoor:[]};renderPyramids();return;}
   var{data:sets,error:e2}=await sb.from('sets').select('grade,result,entry_id').in('entry_id',ents.map(function(e){return e.id;}));
   console.log('pyramid sets:', sets, 'error:', e2);
+  console.log('em keys:', Object.keys(em));
   var em={};ents.forEach(function(e){em[e.id]=e;});
   var indoor=[],outdoor=[];
   (sets||[]).forEach(function(s){
