@@ -923,18 +923,21 @@ function calcTrend(vals){var n=vals.length,ym=vals.reduce(function(a,b){return a
 
 // ── PYRAMID ───────────────────────────────────────────────────
 async function loadPyramid(){
-  var{data:ents,error:e1}=await sb.from('entries').select('id,category,exercise_id,sessions(date)').eq('user_id',user.id).in('exercise_type',['climbing','endurance_laps']);
-  console.log('PYRAMID A ents:',ents?.length,'error:',e1);
-  if(!ents||!ents.length){S.pyramidSends={indoor:[],outdoor:[]};renderPyramids();return;}
-  var eids=ents.map(function(e){return e.id;});
-  var{data:sets,error:e2}=await sb.from('sets').select('grade,result,entry_id').in('entry_id',eids);
-  console.log('PYRAMID B sets:',sets?.length,'error:',e2);
-  var em={};ents.forEach(function(e){em[e.id]=e;});
-  console.log('PYRAMID C em keys:',Object.keys(em));
+  var pyrEntsResp=await sb.from('entries').select('id,category,exercise_id,sessions(date)').eq('user_id',user.id).in('exercise_type',['climbing','endurance_laps']);
+  var pyrEnts=pyrEntsResp.data;
+  console.log('PYRAMID A ents:',pyrEnts?pyrEnts.length:0,'error:',pyrEntsResp.error);
+  if(!pyrEnts||!pyrEnts.length){S.pyramidSends={indoor:[],outdoor:[]};renderPyramids();return;}
+  var pyrEids=pyrEnts.map(function(e){return e.id;});
+  var pyrSetsResp=await sb.from('sets').select('grade,result,entry_id').in('entry_id',pyrEids);
+  var pyrSets=pyrSetsResp.data;
+  console.log('PYRAMID B sets:',pyrSets?pyrSets.length:0,'error:',pyrSetsResp.error);
+  var pyrMap={};pyrEnts.forEach(function(e){pyrMap[e.id]=e;});
+  console.log('PYRAMID C map keys:',Object.keys(pyrMap).length);
   var indoor=[],outdoor=[];
-  (sets||[]).forEach(function(s){
-    console.log('PYRAMID D set:',s.grade,s.result,em[s.entry_id]?.category);
-    var e=em[s.entry_id];if(!e)return;
+  (pyrSets||[]).forEach(function(s){
+    var e=pyrMap[s.entry_id];
+    console.log('PYRAMID D:',s.grade,s.result,'entry found:',!!e,'cat:',e?e.category:'none');
+    if(!e)return;
     var cat=e.category;
     if(!cat){var ex=S.exercises.find(function(x){return x.id===e.exercise_id;});cat=ex?ex.category:null;}
     if(s.result!=='sent'&&s.result!=='flash'&&s.result!=='complete')return;
