@@ -284,8 +284,8 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
   <div id="tab-pyramid" class="tab content" style="display:none">
     <div class="card" style="margin-bottom:16px">
       <div class="field-row">
-        <div class="field"><label>Indoor target grade</label><input type="text" id="pyr-indoor-target" placeholder="5.13a" oninput="renderPyramids()"></div>
-        <div class="field"><label>Outdoor target grade</label><input type="text" id="pyr-outdoor-target" placeholder="5.12a" oninput="renderPyramids()"></div>
+        <div class="field"><label>Indoor target grade</label><input type="text" id="pyr-indoor-target" placeholder="5.13a" onchange="savePyramidTargets()"></div>
+        <div class="field"><label>Outdoor target grade</label><input type="text" id="pyr-outdoor-target" placeholder="5.12a" onchange="savePyramidTargets()"></div>
       </div>
     </div>
     <div style="margin-bottom:8px;font-size:13px;font-weight:500">Indoor Sport</div>
@@ -923,21 +923,23 @@ function calcTrend(vals){var n=vals.length,ym=vals.reduce(function(a,b){return a
 
 // ── PYRAMID ───────────────────────────────────────────────────
 async function loadPyramid(){
+  // Load saved targets
+  var settResp=await sb.from('user_settings').select('pyramid_indoor_target,pyramid_outdoor_target').eq('user_id',user.id).single();
+  if(settResp.data){
+    if(settResp.data.pyramid_indoor_target)document.getElementById('pyr-indoor-target').value=settResp.data.pyramid_indoor_target;
+    if(settResp.data.pyramid_outdoor_target)document.getElementById('pyr-outdoor-target').value=settResp.data.pyramid_outdoor_target;
+  }
+  // Fetch sends
   var pyrEntsResp=await sb.from('entries').select('id,category,exercise_id,sessions(date)').eq('user_id',user.id).in('exercise_type',['climbing','endurance_laps']);
   var pyrEnts=pyrEntsResp.data;
-  console.log('PYRAMID A ents:',pyrEnts?pyrEnts.length:0,'error:',pyrEntsResp.error);
   if(!pyrEnts||!pyrEnts.length){S.pyramidSends={indoor:[],outdoor:[]};renderPyramids();return;}
   var pyrEids=pyrEnts.map(function(e){return e.id;});
   var pyrSetsResp=await sb.from('sets').select('grade,result,entry_id').in('entry_id',pyrEids);
   var pyrSets=pyrSetsResp.data;
-  console.log('PYRAMID B sets:',pyrSets?pyrSets.length:0,'error:',pyrSetsResp.error);
   var pyrMap={};pyrEnts.forEach(function(e){pyrMap[e.id]=e;});
-  console.log('PYRAMID C map keys:',Object.keys(pyrMap).length);
   var indoor=[],outdoor=[];
   (pyrSets||[]).forEach(function(s){
-    var e=pyrMap[s.entry_id];
-    console.log('PYRAMID D:',s.grade,s.result,'entry found:',!!e,'cat:',e?e.category:'none');
-    if(!e)return;
+    var e=pyrMap[s.entry_id];if(!e)return;
     var cat=e.category;
     if(!cat){var ex=S.exercises.find(function(x){return x.id===e.exercise_id;});cat=ex?ex.category:null;}
     if(s.result!=='sent'&&s.result!=='flash'&&s.result!=='complete')return;
@@ -947,8 +949,14 @@ async function loadPyramid(){
     if(cat==='rope'||cat==='boulder')indoor.push(g);
     else if(cat==='outdoor')outdoor.push(g);
   });
-  console.log('PYRAMID E indoor:',indoor,'outdoor:',outdoor);
   S.pyramidSends={indoor,outdoor};
+  renderPyramids();
+}
+
+async function savePyramidTargets(){
+  var indoor=document.getElementById('pyr-indoor-target').value.trim();
+  var outdoor=document.getElementById('pyr-outdoor-target').value.trim();
+  await sb.from('user_settings').upsert({user_id:user.id,pyramid_indoor_target:indoor,pyramid_outdoor_target:outdoor},{onConflict:'user_id'});
   renderPyramids();
 }
 
