@@ -596,7 +596,7 @@ function climbHTML(e){
   return html;
 }
 
-function endoHTML(e){
+function endoHTML(e){function endoHTML(e){
   var id=e.id;
   var n=parseInt(e.endoNumSets)||1;
   var html='<div class="lifting-meta"><div class="field"><label>Sets</label><input type="number" value="'+n+'" min="1" max="20" oninput="updEndoSets(\''+id+'\',this.value)"></div></div>';
@@ -614,7 +614,7 @@ function endoHTML(e){
   html+='</div>';
   return html;
 }
-
+                     
 function cardioHTML(e){
   var id=e.id;
   return'<div class="field-row">'
