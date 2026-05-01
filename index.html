@@ -484,7 +484,7 @@ function renderChips(){var cat=document.getElementById('add-cat-filter').value,q
 // ── SESSION LOGGING ───────────────────────────────────────────
 async function addEntry(ex) {
   var type=ex.type||CAT_TYPE[ex.category]||'lifting';
-  var entry={id:uid(),exercise_id:ex.id,exercise_name:ex.name,exercise_type:type,exercise_cat:ex.category,category:ex.category,stimulus:ex.stimulus||'strength',notes:'',numSets:3,repsPerSet:['','',''],load:'',rir:'',rpe:'',hangTime:'10',hangSets:'4',hangReps:'1',climbs:[{name:'',grade:'',attempts:'1',result:'attempt',climb_notes:''}],endoSets:[{reps:[{name:'',grade:'',result:'attempt',climb_notes:''}]}],cDur:'',cDist:'',cPace:'',cGrade:'',cType:'',_prev:[]};
+  var entry={id:uid(),exercise_id:ex.id,exercise_name:ex.name,exercise_type:type,exercise_cat:ex.category,category:ex.category,stimulus:ex.stimulus||'strength',notes:'',numSets:3,repsPerSet:['','',''],load:'',rir:'',rpe:'',hangTime:'10',hangSets:'4',hangReps:'1',climbs:[{name:'',grade:'',attempts:'1',result:'attempt',climb_notes:''}],endoSets:[{grades:'',result:'sent'}],endoNumSets:1,cDur:'',cDist:'',cPace:'',cGrade:'',cType:'',_prev:[]};
   var prev=await loadPrev(ex.id);
   entry._prev=prev;
   S.entries.push(entry);
@@ -507,11 +507,8 @@ function addClimb(id){var e=S.entries.find(function(x){return x.id===id;});if(e)
 function rmClimb(id,i){var e=S.entries.find(function(x){return x.id===id;});if(e&&e.climbs.length>1)e.climbs.splice(i,1);renderEntries();}
 function updSets(id,n){var e=S.entries.find(function(x){return x.id===id;});if(!e)return;var num=Math.max(1,Math.min(10,parseInt(n)||1));e.numSets=num;while((e.repsPerSet||[]).length<num)(e.repsPerSet=e.repsPerSet||[]).push('');renderEntries();}
 // Endurance
-function updEndoClimb(id,si,ri,k,v){var e=S.entries.find(function(x){return x.id===id;});if(e&&e.endoSets[si]&&e.endoSets[si].reps[ri])e.endoSets[si].reps[ri][k]=v;}
-function addEndoRep(id,si){var e=S.entries.find(function(x){return x.id===id;});if(e&&e.endoSets[si])e.endoSets[si].reps.push({name:'',grade:'',result:'attempt',climb_notes:''});renderEntries();}
-function rmEndoRep(id,si,ri){var e=S.entries.find(function(x){return x.id===id;});if(e&&e.endoSets[si]&&e.endoSets[si].reps.length>1)e.endoSets[si].reps.splice(ri,1);renderEntries();}
-function addEndoSet(id){var e=S.entries.find(function(x){return x.id===id;});if(e)e.endoSets.push({reps:[{name:'',grade:'',result:'attempt',climb_notes:''}]});renderEntries();}
-function rmEndoSet(id,si){var e=S.entries.find(function(x){return x.id===id;});if(e&&e.endoSets.length>1)e.endoSets.splice(si,1);renderEntries();}
+function updEndoSet(id,i,k,v){var e=S.entries.find(function(x){return x.id===id;});if(!e)return;if(!e.endoSets)e.endoSets=[];while(e.endoSets.length<=i)e.endoSets.push({grades:'',result:'sent'});e.endoSets[i][k]=v;}
+function updEndoSets(id,n){var e=S.entries.find(function(x){return x.id===id;});if(!e)return;var num=Math.max(1,Math.min(20,parseInt(n)||1));e.endoNumSets=num;while((e.endoSets||[]).length<num)(e.endoSets=e.endoSets||[]).push({grades:'',result:'sent'});renderEntries();}
 
 function renderEntries() {
   var cont=document.getElementById('log-entries');
@@ -600,29 +597,21 @@ function climbHTML(e){
 }
 
 function endoHTML(e){
-  var id=e.id,html='';
-  (e.endoSets||[]).forEach(function(s,si){
-    html+='<div class="endo-set">'
-      +'<div class="endo-set-header"><span>Set '+(si+1)+'</span>'
-      +'<button class="btn-danger" onclick="rmEndoSet(\''+id+'\','+si+')">remove set</button></div>';
-    (s.reps||[]).forEach(function(r,ri){
-      html+='<div class="endo-rep"><span class="endo-rep-num">'+' '+(ri+1)+'</span>'
-        +'<div style="flex:1;display:flex;flex-direction:column;gap:6px">'
-        +'<div class="field-row" style="margin-bottom:0">'
-        +'<div class="field wide"><label>Climb</label><input type="text" value="'+esc(r.name||'')+'" placeholder="Route name" oninput="updEndoClimb(\''+id+'\','+si+','+ri+',\'name\',this.value)"></div>'
-        +'<div class="field"><label>Grade</label><input type="text" value="'+esc(r.grade||'')+'" placeholder="5.11a" oninput="updEndoClimb(\''+id+'\','+si+','+ri+',\'grade\',this.value)"></div>'
-        +'<div class="field"><label>Result</label><select onchange="updEndoClimb(\''+id+'\','+si+','+ri+',\'result\',this.value)">'
-        +['complete','bailed','fell'].map(function(rv){return'<option'+(r.result===rv?' selected':'')+'>'+rv+'</option>';}).join('')
-        +'</select></div>'
-        +'<button class="btn-danger" onclick="rmEndoRep(\''+id+'\','+si+','+ri+')" style="margin-top:18px">✕</button>'
-        +'</div>'
-        +'<input type="text" value="'+esc(r.climb_notes||'')+'" placeholder="Notes..." oninput="updEndoClimb(\''+id+'\','+si+','+ri+',\'climb_notes\',this.value)" style="font-size:12px">'
-        +'</div></div>';
-    });
-    html+='<div style="padding:8px 10px"><button class="btn btn-sm" onclick="addEndoRep(\''+id+'\','+si+')">+ climb</button></div>';
-    html+='</div>';
-  });
-  html+='<button class="btn btn-sm" style="margin-top:6px" onclick="addEndoSet(\''+id+'\')">+ set</button>';
+  var id=e.id;
+  var n=parseInt(e.endoNumSets)||1;
+  var html='<div class="lifting-meta"><div class="field"><label>Sets</label><input type="number" value="'+n+'" min="1" max="20" oninput="updEndoSets(\''+id+'\',this.value)"></div></div>';
+  html+='<div class="sets-label">Laps per set</div><div class="sets-grid">';
+  for(var i=0;i<n;i++){
+    var s=(e.endoSets||[])[i]||{grades:'',result:'sent'};
+    html+='<div class="set-row-item" style="grid-template-columns:28px 1fr 80px">'
+      +'<span class="set-num">'+(i+1)+'</span>'
+      +'<input type="text" value="'+esc(s.grades||'')+'" placeholder="5.10a, 5.10d, 5.11a" oninput="updEndoSet(\''+id+'\','+i+',\'grades\',this.value)">'
+      +'<select style="font-size:12px;padding:6px 4px" onchange="updEndoSet(\''+id+'\','+i+',\'result\',this.value)">'
+      +['sent','fell'].map(function(r){return'<option'+(s.result===r?' selected':'')+'>'+r+'</option>';}).join('')
+      +'</select>'
+      +'</div>';
+  }
+  html+='</div>';
   return html;
 }
 
@@ -674,7 +663,7 @@ function buildSets(entry,eid){
   if(t==='lifting'){var n=parseInt(entry.numSets)||1;for(var i=0;i<n;i++)rows.push({user_id:user.id,entry_id:eid,set_number:i+1,load:parseFloat(entry.load)||null,reps:parseFloat((entry.repsPerSet||[])[i])||null,rir:parseFloat(entry.rir)||null,rpe:parseFloat(entry.rpe)||null});}
   else if(t==='finger_training')rows.push({user_id:user.id,entry_id:eid,set_number:1,load:parseFloat(entry.load)||null,hang_time:parseFloat(entry.hangTime)||null,hang_sets:parseFloat(entry.hangSets)||null,hang_reps:parseFloat(entry.hangReps)||null,rpe:parseFloat(entry.rpe)||null});
   else if(t==='climbing')(entry.climbs||[]).forEach(function(c,i){rows.push({user_id:user.id,entry_id:eid,set_number:i+1,climb_name:c.name||null,grade:c.grade||null,attempts:parseInt(c.attempts)||null,result:c.result||null,climb_notes:c.climb_notes||null});});
-  else if(t==='endurance_laps')(entry.endoSets||[]).forEach(function(s,si){(s.reps||[]).forEach(function(r,ri){rows.push({user_id:user.id,entry_id:eid,set_number:si+1,rep_number:ri+1,climb_name:r.name||null,grade:r.grade||null,result:r.result||null,climb_notes:r.climb_notes||null});});});
+  else if(t==='endurance_laps')(entry.endoSets||[]).forEach(function(s,si){rows.push({user_id:user.id,entry_id:eid,set_number:si+1,grade:s.grades||null,result:s.result||null});});
   else if(t==='cardio')rows.push({user_id:user.id,entry_id:eid,set_number:1,duration_min:parseFloat(entry.cDur)||null,distance:entry.cDist||null,avg_pace:entry.cPace||null,cardio_grade:parseFloat(entry.cGrade)||null,cardio_type:entry.cType||null});
   return rows;
 }
@@ -739,8 +728,7 @@ function showDetail(sid){
     html+='<div class="detail-entry"><div class="detail-entry-name">'+esc(e.exercise_name)
       +(e.category?'<span class="tag tag-'+e.category+'" style="margin-left:8px;font-size:10px">'+e.category.replace('_',' ')+'</span>':'')+'</div>';
     if(e.exercise_type==='endurance_laps'){
-      var bySet={};(e.sets||[]).forEach(function(st){if(!bySet[st.set_number])bySet[st.set_number]=[];bySet[st.set_number].push(st);});
-      Object.keys(bySet).sort().forEach(function(sn){html+='<div class="detail-set" style="margin-bottom:4px"><span>Set '+sn+':</span>';bySet[sn].forEach(function(r){html+='<div style="padding-left:12px;color:var(--text);font-size:12px">'+[r.climb_name,r.grade,r.result].filter(Boolean).join(' ')+(r.climb_notes?' — '+r.climb_notes:'')+'</div>';});html+='</div>';});
+      (e.sets||[]).sort(function(a,b){return(a.set_number||0)-(b.set_number||0);}).forEach(function(st,j){html+='<div class="detail-set">Set '+(j+1)+': <span>'+esc(st.grade||'')+'</span> <span style="color:var(--muted)">'+esc(st.result||'')+'</span></div>';});
     } else {
       (e.sets||[]).forEach(function(st,j){html+='<div class="detail-set">Set '+(j+1)+': <span>'+fmtCompact(st,e.exercise_type)+'</span>'+(st.climb_notes?'<span style="color:var(--muted);font-style:italic;margin-left:6px">'+esc(st.climb_notes)+'</span>':'')+'</div>';});
     }
@@ -773,7 +761,7 @@ async function editSession(sid){
     if(t==='lifting'){e.numSets=sets.length||3;e.repsPerSet=sets.map(function(s){return String(s.reps||'');});e.load=sets[0]?.load||'';e.rir=sets[0]?.rir||'';e.rpe=sets[0]?.rpe||'';}
     else if(t==='finger_training'){e.load=sets[0]?.load||'';e.hangTime=sets[0]?.hang_time||'10';e.hangSets=sets[0]?.hang_sets||'4';e.hangReps=sets[0]?.hang_reps||'1';e.rpe=sets[0]?.rpe||'';}
     else if(t==='climbing'){e.climbs=sets.length?sets.map(function(s){return{name:s.climb_name||'',grade:s.grade||'',attempts:String(s.attempts||1),result:s.result||'attempt',climb_notes:s.climb_notes||''};}):[{name:'',grade:'',attempts:'1',result:'attempt',climb_notes:''}];}
-    else if(t==='endurance_laps'){var bySet={};sets.forEach(function(s){var sn=s.set_number||1;if(!bySet[sn])bySet[sn]=[];bySet[sn].push(s);});e.endoSets=Object.keys(bySet).sort().map(function(sn){return{reps:bySet[sn].map(function(r){return{name:r.climb_name||'',grade:r.grade||'',result:r.result||'attempt',climb_notes:r.climb_notes||''};})}; });}
+    else if(t==='endurance_laps'){e.endoSets=sets.sort(function(a,b){return(a.set_number||0)-(b.set_number||0);}).map(function(s){return{grades:s.grade||'',result:s.result||'sent'};});e.endoNumSets=e.endoSets.length||1;}
     else if(t==='cardio'){e.cDur=sets[0]?.duration_min||'';e.cDist=sets[0]?.distance||'';e.cPace=sets[0]?.avg_pace||'';e.cGrade=sets[0]?.cardio_grade||'';e.cType=sets[0]?.cardio_type||'';}
     if(!e.endoSets)e.endoSets=[{reps:[{name:'',grade:'',result:'attempt',climb_notes:''}]}];
     if(!e.climbs)e.climbs=[{name:'',grade:'',attempts:'1',result:'attempt',climb_notes:''}];
@@ -834,13 +822,14 @@ async function loadChart(){
   // For lifting and finger training — dual Y axis
   if(t==='lifting'||t==='finger_training'){
     var byDate={};
-    (sets||[]).forEach(function(s){var e=em[s.entry_id];if(!e)return;var d=e.sessions?.date;if(!d)return;if(!byDate[d])byDate[d]={loads:[],reps:[],hangTimes:[]};if(s.load)byDate[d].loads.push(parseFloat(s.load));if(s.reps)byDate[d].reps.push(parseFloat(s.reps));if(s.hang_time)byDate[d].hangTimes.push(parseFloat(s.hang_time));});
+    (sets||[]).forEach(function(s){var e=em[s.entry_id];if(!e)return;var d=e.sessions?.date;if(!d)return;if(!byDate[d])byDate[d]={loads:[],reps:[],hangTimes:[],hangReps:[]};if(s.load)byDate[d].loads.push(parseFloat(s.load));if(s.reps)byDate[d].reps.push(parseFloat(s.reps));if(s.hang_time)byDate[d].hangTimes.push(parseFloat(s.hang_time));if(s.hang_reps)byDate[d].hangReps.push(parseFloat(s.hang_reps));});
     var dates=Object.keys(byDate).sort();
     if(!dates.length){document.getElementById('prog-empty').style.display='block';return;}
     var loadPts=dates.map(function(d){return{x:d,y:Math.max.apply(null,byDate[d].loads)||null};});
     var repPts=t==='lifting'?dates.map(function(d){var r=byDate[d].reps;return{x:d,y:r.length?r.reduce(function(a,b){return a+b;},0)/r.length:null};}):null;
     var hangPts=t==='finger_training'?dates.map(function(d){return{x:d,y:byDate[d].hangTimes[0]||null};}):null;
-    renderDualChart(loadPts,repPts,hangPts,ex.name,t);
+    var hangRepPts=t==='finger_training'?dates.map(function(d){return{x:d,y:byDate[d].hangReps[0]||null};}):null;
+    renderDualChart(loadPts,repPts,hangPts,hangRepPts,ex.name,t);
     return;
   }
 
@@ -850,10 +839,10 @@ async function loadChart(){
   pts2.sort(function(a,b){return a.date.localeCompare(b.date);});
   if(!pts2.length){document.getElementById('prog-empty').style.display='block';return;}
   var loadPts2=pts2.map(function(p){return{x:p.date,y:p.value};});
-  renderDualChart(loadPts2,null,null,ex.name,'cardio');
+  renderDualChart(loadPts2,null,null,null,ex.name,'cardio');
 }
 
-function renderDualChart(loadPts,repPts,hangPts,title,type){
+function renderDualChart(loadPts,repPts,hangPts,hangRepPts,title,type){
   var datasets=[];
   var yAxes={};
   // Load dataset
@@ -873,13 +862,19 @@ function renderDualChart(loadPts,repPts,hangPts,title,type){
     datasets.push({label:'Hang time (s)',data:hangPts,borderColor:'#a29bfe',backgroundColor:'rgba(162,155,254,0.0)',borderWidth:0,pointRadius:5,pointBackgroundColor:'#a29bfe',pointStyle:'rect',type:'scatter',yAxisID:'yHang',showLine:false});
     yAxes.yHang={type:'linear',position:'right',grid:{drawOnChartArea:false},ticks:{color:'#a29bfe',font:{family:'IBM Plex Mono',size:10}},title:{display:true,text:'Hang (s)',color:'#a29bfe',font:{size:10}}};
   }
+  // Hang reps dataset (finger only)
+  if(hangRepPts&&hangRepPts.some(function(p){return p.y!==null;})){
+    datasets.push({label:'Reps',data:hangRepPts,borderColor:'#fd79a8',backgroundColor:'rgba(253,121,168,0.0)',borderWidth:0,pointRadius:5,pointBackgroundColor:'#fd79a8',pointStyle:'star',type:'scatter',yAxisID:'yHangReps',showLine:false});
+    yAxes.yHangReps={type:'linear',position:'right',grid:{drawOnChartArea:false},ticks:{color:'#fd79a8',font:{family:'IBM Plex Mono',size:10}},title:{display:true,text:'Reps',color:'#fd79a8',font:{size:10}}};
+  }
 
   document.getElementById('prog-title').textContent=title;
   document.getElementById('prog-chart-card').style.display='block';
   document.getElementById('prog-legend').innerHTML=
     '<span style="color:#4ecdc4">● load</span>'
     +(repPts?'<span style="color:#f7b731">▲ avg reps</span>':'')
-    +(hangPts?'<span style="color:#a29bfe">■ hang time</span>':'');
+    +(hangPts?'<span style="color:#a29bfe">■ hang time</span>':'')
+    +(hangRepPts?'<span style="color:#fd79a8">★ reps</span>':'');
   var latest=loadPts[loadPts.length-1]?.y,first=loadPts[0]?.y,delta=latest&&first?parseFloat((latest-first).toFixed(1)):0;
   var sEl=document.getElementById('prog-stats');sEl.style.display='grid';
   sEl.innerHTML=[{l:'Sessions',v:loadPts.length},{l:'Latest load',v:latest?latest+'lb':'—'},{l:'Change',v:latest&&first?(delta>=0?'+':'')+delta+'lb':'—'}].map(function(s){return'<div class="stat"><div class="stat-val">'+s.v+'</div><div class="stat-lbl">'+s.l+'</div></div>';}).join('');
