@@ -208,6 +208,7 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
     </div>
     <nav>
       <button class="active" onclick="switchTab('log',this)">Log</button>
+      <button onclick="switchTab('templates',this)">Templates</button>
       <button onclick="switchTab('history',this)">History</button>
       <button onclick="switchTab('progress',this)">Progress</button>
       <button onclick="switchTab('pyramid',this)">Pyramid</button>
@@ -246,6 +247,34 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
       <div class="chip-list" id="chip-list"></div>
     </div>
     <button class="btn btn-primary btn-block" id="save-btn" onclick="saveSession()">Save Session</button>
+  </div>
+
+
+  <!-- TEMPLATES TAB -->
+  <div id="tab-templates" class="tab content" style="display:none">
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-label" style="margin-bottom:10px">New template</div>
+      <div class="field-row">
+        <div class="field wide"><label>Template name</label><input type="text" id="tmpl-name" placeholder="Push day, Limit boulder..."></div>
+      </div>
+      <div class="filter-bar" style="margin-top:4px">
+        <select id="tmpl-cat-filter" onchange="renderTmplChips()">
+          <option value="">all</option>
+          <option value="conditioning">conditioning</option>
+          <option value="finger_training">finger training</option>
+          <option value="rope">rope</option>
+          <option value="boulder">boulder</option>
+          <option value="outdoor">outdoor</option>
+          <option value="cardio">cardio</option>
+        </select>
+        <input type="text" id="tmpl-search" placeholder="search exercises..." oninput="renderTmplChips()">
+      </div>
+      <div class="chip-list" id="tmpl-chip-list" style="margin-top:8px"></div>
+      <div id="tmpl-selected" style="margin-top:10px"></div>
+      <button class="btn btn-primary" style="margin-top:8px" onclick="saveTemplate()">Save Template</button>
+    </div>
+    <div class="section-label" style="margin-bottom:8px">Saved templates</div>
+    <div id="tmpl-list"></div>
   </div>
 
   <!-- HISTORY TAB -->
@@ -354,6 +383,20 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
           </div>
         </div>
       </div>
+      <div class="field-row" style="margin-top:8px">
+        <div class="field full">
+          <label>Movement pattern (select multiple)</label>
+          <div id="mp-checkboxes" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="push" style="width:auto;margin:0"> Push</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="pull" style="width:auto;margin:0"> Pull</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="hinge" style="width:auto;margin:0"> Hinge</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="squat" style="width:auto;margin:0"> Squat</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="anterior_core" style="width:auto;margin:0"> Anterior core</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="posterior_core" style="width:auto;margin:0"> Posterior core</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="finger_training" style="width:auto;margin:0"> Finger training</label>
+          </div>
+        </div>
+      </div>
       <button class="btn btn-primary" style="margin-top:6px" onclick="addExercise()">Add</button>
     </div>
     <div class="filter-bar">
@@ -384,7 +427,7 @@ var sb, user;
 var S = {
   exercises:[], acVals:{names:[],grips:[],lift_types:[],workout_types:[]},
   entries:[], sessions:[], chart:null, selEx:null,
-  editSessionId:null,
+  editSessionId:null, editExId:null,
   progCatFilter:'', progSearch:'',
   histCatFilter:'',
   pyramidSends:[], pyrIndoor:'', pyrOutdoor:''
@@ -449,7 +492,7 @@ window.onload = async function() {
   });
 };
 function showAuth(){document.getElementById('auth-screen').style.display='flex';document.getElementById('main-app').style.display='none';}
-async function showApp(){document.getElementById('auth-screen').style.display='none';document.getElementById('main-app').style.display='block';document.getElementById('log-date').value=new Date().toISOString().slice(0,10);await loadExercises();}
+async function showApp(){document.getElementById('auth-screen').style.display='none';document.getElementById('main-app').style.display='block';document.getElementById('log-date').value=new Date().toISOString().slice(0,10);await loadExercises();loadDraft();}
 async function signIn(){var e=document.getElementById('auth-email').value.trim(),p=document.getElementById('auth-pass').value;if(!e||!p){setAuthMsg('Enter email and password');return;}var{error}=await sb.auth.signInWithPassword({email:e,password:p});if(error)setAuthMsg(error.message);}
 async function signUp(){var e=document.getElementById('auth-email').value.trim(),p=document.getElementById('auth-pass').value;if(!e||!p){setAuthMsg('Enter email and password');return;}if(p.length<6){setAuthMsg('Password must be 6+ characters');return;}var{error}=await sb.auth.signUp({email:e,password:p});if(error)setAuthMsg(error.message);else setAuthMsg('Check your email to confirm');}
 async function signOut(){await sb.auth.signOut();}
@@ -465,6 +508,7 @@ function switchTab(name, btn) {
   if(name==='progress'){buildProgCatPills();filterProgEx();}
   if(name==='exercises') renderExList();
   if(name==='pyramid') loadPyramid();
+  if(name==='templates'){renderTmplChips();loadTemplates();}
 }
 
 // ── EXERCISES ─────────────────────────────────────────────────
@@ -476,9 +520,79 @@ async function loadExercises() {
 }
 function refreshAC(){var e=S.exercises;function uniq(a){return[...new Set(a.filter(Boolean))].sort();}S.acVals={names:uniq(e.map(function(x){return x.name;})),grips:uniq(e.map(function(x){return x.grip;})),lift_types:uniq(e.map(function(x){return x.lift_type;})),workout_types:uniq(e.map(function(x){return x.workout_type;}))};}
 function onCatChange(){var cat=document.getElementById('new-cat').value;document.getElementById('finger-extra').style.display=cat==='finger_training'?'block':'none';document.getElementById('new-type').value=cat==='finger_training'?'finger_training':(CAT_TYPE[cat]||'lifting');}
-async function addExercise(){var name=document.getElementById('new-name').value.trim();if(!name){toast('Enter a name','err');return;}if(S.exercises.find(function(e){return e.name.toLowerCase()===name.toLowerCase();})){toast('Already exists','err');return;}var row={user_id:user.id,name,category:document.getElementById('new-cat').value,stimulus:document.getElementById('new-stim').value,type:document.getElementById('new-type').value,grip:document.getElementById('new-grip')?.value||null,lift_type:document.getElementById('new-ltype')?.value||null,workout_type:document.getElementById('new-wtype')?.value||null};var{error}=await sb.from('exercises').insert(row);if(error){toast('Error: '+error.message,'err');return;}toast('Added','ok');document.getElementById('new-name').value='';['new-grip','new-ltype','new-wtype'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});await loadExercises();renderExList();}
+async function addExercise(){var name=document.getElementById('new-name').value.trim();if(!name){toast('Enter a name','err');return;}if(S.exercises.find(function(e){return e.name.toLowerCase()===name.toLowerCase();})){toast('Already exists','err');return;}var mpChecked=[...document.querySelectorAll('#mp-checkboxes input:checked')].map(function(c){return c.value;});var row={user_id:user.id,name,category:document.getElementById('new-cat').value,stimulus:document.getElementById('new-stim').value,type:document.getElementById('new-type').value,grip:document.getElementById('new-grip')?.value||null,lift_type:document.getElementById('new-ltype')?.value||null,workout_type:document.getElementById('new-wtype')?.value||null,movement_pattern:mpChecked.length?mpChecked.join(','):null};var{error}=await sb.from('exercises').insert(row);if(error){toast('Error: '+error.message,'err');return;}toast('Added','ok');document.getElementById('new-name').value='';['new-grip','new-ltype','new-wtype'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});document.querySelectorAll('#mp-checkboxes input').forEach(function(c){c.checked=false;});await loadExercises();renderExList();}
 async function deleteExercise(id){if(!confirm('Remove exercise?'))return;await sb.from('exercises').delete().eq('id',id);toast('Removed','ok');await loadExercises();renderExList();}
-function renderExList(){var cat=document.getElementById('ex-cat-filter').value,q=(document.getElementById('ex-search').value||'').toLowerCase(),filtered=S.exercises.filter(function(e){return(!cat||e.category===cat)&&(!q||e.name.toLowerCase().includes(q));});var cont=document.getElementById('ex-list');if(!filtered.length){cont.innerHTML='<div class="empty" style="padding:20px">None found</div>';return;}var html='';CATS.forEach(function(c){var exs=filtered.filter(function(e){return e.category===c;});if(!exs.length)return;html+='<div class="ex-section-head">'+c.replace('_',' ')+'</div>';exs.forEach(function(ex){var meta=[ex.stimulus,ex.type,ex.grip,ex.lift_type,ex.workout_type].filter(Boolean).join(' · ');html+='<div class="ex-row"><div class="ex-info"><div class="ex-name">'+esc(ex.name)+'</div><div class="ex-meta">'+esc(meta)+'</div></div><button class="btn-danger" onclick="deleteExercise(\''+ex.id+'\')">✕</button></div>';});});cont.innerHTML=html;}
+function renderExList(){
+  var cat=document.getElementById('ex-cat-filter').value,q=(document.getElementById('ex-search').value||'').toLowerCase();
+  var filtered=S.exercises.filter(function(e){return(!cat||e.category===cat)&&(!q||e.name.toLowerCase().includes(q));});
+  var cont=document.getElementById('ex-list');
+  if(!filtered.length){cont.innerHTML='<div class="empty" style="padding:20px">None found</div>';return;}
+  var html='';
+  var MPs=['push','pull','hinge','squat','anterior_core','posterior_core','finger_training'];
+  CATS.forEach(function(c){
+    var exs=filtered.filter(function(e){return e.category===c;});
+    if(!exs.length)return;
+    html+='<div class="ex-section-head">'+c.replace('_',' ')+'</div>';
+    exs.forEach(function(ex){
+      var mp=ex.movement_pattern?ex.movement_pattern.split(',').join('/'):null;
+      var meta=[ex.stimulus,ex.type,ex.grip,ex.lift_type,ex.workout_type,mp].filter(Boolean).join(' · ');
+      var isEditing=S.editExId===ex.id;
+      if(isEditing){
+        var mpVals=(ex.movement_pattern||'').split(',').filter(Boolean);
+        html+='<div class="ex-row" style="flex-direction:column;align-items:stretch;gap:8px;padding:12px">'
+          +'<div class="field-row">'
+          +'<div class="field wide"><label>Name</label><input id="edit-ex-name" value="'+esc(ex.name)+'" type="text"></div>'
+          +'<div class="field"><label>Category</label><select id="edit-ex-cat">'
+          +CATS.map(function(cc){return'<option value="'+cc+'"'+(ex.category===cc?' selected':'')+'>'+cc.replace('_',' ')+'</option>';}).join('')
+          +'</select></div>'
+          +'<div class="field"><label>Stimulus</label><select id="edit-ex-stim">'
+          +['strength','power','power_endurance','capacity','rehab'].map(function(s){return'<option'+(ex.stimulus===s?' selected':'')+'>'+s+'</option>';}).join('')
+          +'</select></div>'
+          +'<div class="field"><label>Type</label><select id="edit-ex-type">'
+          +['lifting','finger_training','climbing','endurance_laps','cardio'].map(function(t){return'<option'+(ex.type===t?' selected':'')+'>'+t+'</option>';}).join('')
+          +'</select></div>'
+          +'</div>'
+          +'<div class="field-row">'
+          +'<div class="field"><label>Grip</label><input id="edit-ex-grip" value="'+esc(ex.grip||'')+'" placeholder="half crimp..." type="text"></div>'
+          +'<div class="field"><label>Lift type</label><input id="edit-ex-ltype" value="'+esc(ex.lift_type||'')+'" placeholder="hang..." type="text"></div>'
+          +'<div class="field"><label>Workout type</label><input id="edit-ex-wtype" value="'+esc(ex.workout_type||'')+'" placeholder="max hang..." type="text"></div>'
+          +'</div>'
+          +'<div><div class="lbl" style="margin-bottom:6px">Movement pattern</div>'
+          +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+          +MPs.map(function(mp){return'<label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text);cursor:pointer"><input type="checkbox" value="'+mp+'"'+(mpVals.indexOf(mp)>=0?' checked':'')+' style="width:auto;margin:0"> '+mp.replace('_',' ')+'</label>';}).join('')
+          +'</div></div>'
+          +'<div class="btn-group"><button class="btn btn-sm btn-primary" onclick="saveExEdit(\''+ex.id+'\')">Save</button><button class="btn btn-sm" onclick="S.editExId=null;renderExList()">Cancel</button><button class="btn-danger" onclick="deleteExercise(\''+ex.id+'\')">Delete</button></div>'
+          +'</div>';
+      } else {
+        html+='<div class="ex-row"><div class="ex-info"><div class="ex-name">'+esc(ex.name)+'</div><div class="ex-meta">'+esc(meta)+'</div></div>'
+          +'<div class="btn-group"><button class="btn btn-sm" onclick="S.editExId=\''+ex.id+'\';renderExList()">Edit</button><button class="btn-danger" onclick="deleteExercise(\''+ex.id+'\')">✕</button></div>'
+          +'</div>';
+      }
+    });
+  });
+  cont.innerHTML=html;
+}
+
+async function saveExEdit(id){
+  var mpChecked=[...document.querySelectorAll('.ex-row input[type=checkbox]:checked')].map(function(c){return c.value;});
+  var updates={
+    name:document.getElementById('edit-ex-name').value.trim(),
+    category:document.getElementById('edit-ex-cat').value,
+    stimulus:document.getElementById('edit-ex-stim').value,
+    type:document.getElementById('edit-ex-type').value,
+    grip:document.getElementById('edit-ex-grip').value||null,
+    lift_type:document.getElementById('edit-ex-ltype').value||null,
+    workout_type:document.getElementById('edit-ex-wtype').value||null,
+    movement_pattern:mpChecked.length?mpChecked.join(','):null
+  };
+  if(!updates.name){toast('Name required','err');return;}
+  var{error}=await sb.from('exercises').update(updates).eq('id',id);
+  if(error){toast('Error: '+error.message,'err');return;}
+  toast('Updated','ok');
+  S.editExId=null;
+  await loadExercises();
+  renderExList();
+}
 function renderChips(){var cat=document.getElementById('add-cat-filter').value,q=(document.getElementById('add-search').value||'').toLowerCase(),filtered=S.exercises.filter(function(e){return(!cat||e.category===cat)&&(!q||e.name.toLowerCase().includes(q));});var cont=document.getElementById('chip-list');cont.innerHTML='';filtered.slice(0,40).forEach(function(ex){var c=document.createElement('button');c.className='chip';c.textContent=ex.name;c.onclick=function(){addEntry(ex);};cont.appendChild(c);});if(!filtered.length)cont.innerHTML='<span style="color:var(--dim);font-size:12px">None found</span>';}
 
 // ── SESSION LOGGING ───────────────────────────────────────────
@@ -500,14 +614,14 @@ async function loadPrev(exId) {
 }
 
 function removeEntry(id){S.entries=S.entries.filter(function(e){return e.id!==id;});renderEntries();}
-function upd(id,k,v){var e=S.entries.find(function(x){return x.id===id;});if(e)e[k]=v;}
-function updReps(id,i,v){var e=S.entries.find(function(x){return x.id===id;});if(e){if(!e.repsPerSet)e.repsPerSet=[];e.repsPerSet[i]=v;}}
-function updClimb(id,i,k,v){var e=S.entries.find(function(x){return x.id===id;});if(e&&e.climbs[i])e.climbs[i][k]=v;}
+function upd(id,k,v){var e=S.entries.find(function(x){return x.id===id;});if(e){e[k]=v;saveDraft();}}
+function updReps(id,i,v){var e=S.entries.find(function(x){return x.id===id;});if(e){if(!e.repsPerSet)e.repsPerSet=[];e.repsPerSet[i]=v;saveDraft();}}
+function updClimb(id,i,k,v){var e=S.entries.find(function(x){return x.id===id;});if(e&&e.climbs[i]){e.climbs[i][k]=v;saveDraft();}}
 function addClimb(id){var e=S.entries.find(function(x){return x.id===id;});if(e)e.climbs.push({name:'',grade:'',attempts:'1',result:'attempt',climb_notes:''});renderEntries();}
 function rmClimb(id,i){var e=S.entries.find(function(x){return x.id===id;});if(e&&e.climbs.length>1)e.climbs.splice(i,1);renderEntries();}
 function updSets(id,n){var e=S.entries.find(function(x){return x.id===id;});if(!e)return;var num=Math.max(1,Math.min(10,parseInt(n)||1));e.numSets=num;while((e.repsPerSet||[]).length<num)(e.repsPerSet=e.repsPerSet||[]).push('');renderEntries();}
 // Endurance
-function updEndoSet(id,i,k,v){var e=S.entries.find(function(x){return x.id===id;});if(!e)return;if(!e.endoSets)e.endoSets=[];while(e.endoSets.length<=i)e.endoSets.push({grades:'',result:'sent'});e.endoSets[i][k]=v;}
+function updEndoSet(id,i,k,v){var e=S.entries.find(function(x){return x.id===id;});if(!e)return;if(!e.endoSets)e.endoSets=[];while(e.endoSets.length<=i)e.endoSets.push({grades:'',result:'sent'});e.endoSets[i][k]=v;saveDraft();}
 function updEndoSets(id,n){var e=S.entries.find(function(x){return x.id===id;});if(!e)return;var num=Math.max(1,Math.min(20,parseInt(n)||1));e.endoNumSets=num;while((e.endoSets||[]).length<num)(e.endoSets=e.endoSets||[]).push({grades:'',result:'sent'});renderEntries();}
 
 function renderEntries() {
@@ -649,6 +763,7 @@ async function saveSession() {
   var{data:sess,error:e1}=await sb.from('sessions').insert({user_id:user.id,date,body_weight:parseFloat(document.getElementById('log-bw').value)||null,notes:document.getElementById('log-notes').value||null}).select().single();
   if(e1){toast('Error: '+e1.message,'err');return;}
   for(var entry of S.entries){var{data:ent,error:e2}=await sb.from('entries').insert({user_id:user.id,session_id:sess.id,exercise_id:entry.exercise_id,exercise_name:entry.exercise_name,exercise_type:entry.exercise_type,category:entry.category,notes:entry.notes||null}).select().single();if(e2||!ent)continue;var sets=buildSets(entry,ent.id);if(sets.length)await sb.from('sets').insert(sets);}
+  clearDraft();
   toast('Saved!','ok');
   S.entries=[];renderEntries();
   document.getElementById('log-bw').value='';
@@ -1030,6 +1145,158 @@ function fmtCompact(s,t){
   return'—';
 }
 function toast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+(type||'');setTimeout(function(){t.classList.remove('show');},2500);}
+// ── DRAFT AUTOSAVE ────────────────────────────────────────────
+function saveDraft(){
+  try{
+    localStorage.setItem('tl_draft',JSON.stringify({
+      date:document.getElementById('log-date').value,
+      bw:document.getElementById('log-bw').value,
+      notes:document.getElementById('log-notes').value,
+      entries:S.entries
+    }));
+  }catch(e){}
+}
+function loadDraft(){
+  try{
+    var d=localStorage.getItem('tl_draft');
+    if(!d)return;
+    var p=JSON.parse(d);
+    if(p.entries&&p.entries.length){
+      if(!confirm('Restore unsaved session from '+p.date+'?'))return;
+      document.getElementById('log-date').value=p.date||'';
+      document.getElementById('log-bw').value=p.bw||'';
+      document.getElementById('log-notes').value=p.notes||'';
+      S.entries=p.entries;
+      renderEntries();
+      toast('Draft restored','ok');
+    }
+  }catch(e){}
+}
+function clearDraft(){try{localStorage.removeItem('tl_draft');}catch(e){}}
+
+// ── TEMPLATES ─────────────────────────────────────────────────
+var S_TMPL_ENTRIES=[];
+
+function renderTmplChips(){
+  var cat=document.getElementById('tmpl-cat-filter').value;
+  var q=(document.getElementById('tmpl-search').value||'').toLowerCase();
+  var filtered=S.exercises.filter(function(e){return(!cat||e.category===cat)&&(!q||e.name.toLowerCase().includes(q));});
+  var cont=document.getElementById('tmpl-chip-list');
+  cont.innerHTML='';
+  filtered.slice(0,40).forEach(function(ex){
+    var c=document.createElement('span');
+    c.className='chip';
+    c.textContent=ex.name;
+    c.onclick=function(){addTmplEntry(ex);};
+    cont.appendChild(c);
+  });
+}
+
+function addTmplEntry(ex){
+  var type=ex.type||CAT_TYPE[ex.category]||'lifting';
+  var entry={id:uid(),exercise_id:ex.id,exercise_name:ex.name,exercise_type:type,exercise_cat:ex.category,category:ex.category,numSets:3,repsPerSet:['','',''],load:'',rir:'',rpe:'',hangTime:'10',hangSets:'4',hangReps:'1'};
+  S_TMPL_ENTRIES.push(entry);
+  renderTmplSelected();
+}
+
+function removeTmplEntry(id){S_TMPL_ENTRIES=S_TMPL_ENTRIES.filter(function(e){return e.id!==id;});renderTmplSelected();}
+
+function updTmpl(id,k,v){var e=S_TMPL_ENTRIES.find(function(x){return x.id===id;});if(e)e[k]=v;}
+function updTmplReps(id,i,v){var e=S_TMPL_ENTRIES.find(function(x){return x.id===id;});if(e){if(!e.repsPerSet)e.repsPerSet=[];e.repsPerSet[i]=v;}}
+function updTmplSets(id,n){var e=S_TMPL_ENTRIES.find(function(x){return x.id===id;});if(!e)return;var num=Math.max(1,Math.min(10,parseInt(n)||1));e.numSets=num;while((e.repsPerSet||[]).length<num)(e.repsPerSet=e.repsPerSet||[]).push('');renderTmplSelected();}
+
+function renderTmplSelected(){
+  var cont=document.getElementById('tmpl-selected');
+  if(!S_TMPL_ENTRIES.length){cont.innerHTML='';return;}
+  var html='<div class="section-label" style="margin-bottom:8px">Exercises in template</div>';
+  S_TMPL_ENTRIES.forEach(function(e){
+    var id=e.id,t=e.exercise_type;
+    html+='<div class="card-flat" style="margin-bottom:6px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+      +'<span style="font-weight:500;font-size:13px">'+esc(e.exercise_name)+'</span>'
+      +'<button class="btn-danger" onclick="removeTmplEntry(\''+id+'\')">remove</button>'
+      +'</div>';
+    if(t==='lifting'){
+      var n=parseInt(e.numSets)||3;
+      html+='<div class="lifting-meta">'
+        +'<div class="field"><label>Load (lb)</label><input type="number" value="'+esc(e.load||'')+'" placeholder="225" oninput="updTmpl(\''+id+'\',\'load\',this.value)"></div>'
+        +'<div class="field"><label>Sets</label><input type="number" value="'+n+'" min="1" max="10" oninput="updTmplSets(\''+id+'\',this.value)"></div>'
+        +'<div class="field"><label>RIR</label><input type="number" value="'+esc(e.rir||'')+'" placeholder="2" step="0.5" oninput="updTmpl(\''+id+'\',\'rir\',this.value)"></div>'
+        +'<div class="field"><label>RPE</label><input type="number" value="'+esc(e.rpe||'')+'" placeholder="8" step="0.5" oninput="updTmpl(\''+id+'\',\'rpe\',this.value)"></div>'
+        +'</div>'
+        +'<div class="sets-label">Reps per set</div><div class="sets-grid">';
+      for(var i=0;i<n;i++){
+        var v=(e.repsPerSet||[])[i]||'';
+        html+='<div class="set-row-item"><span class="set-num">'+(i+1)+'</span><input type="number" value="'+v+'" placeholder="reps" oninput="updTmplReps(\''+id+'\','+i+',this.value)"></div>';
+      }
+      html+='</div>';
+    } else if(t==='finger_training'){
+      html+='<div class="field-row">'
+        +'<div class="field"><label>Load (lb)</label><input type="number" value="'+esc(e.load||'')+'" oninput="updTmpl(\''+id+'\',\'load\',this.value)"></div>'
+        +'<div class="field"><label>Hang (s)</label><input type="number" value="'+esc(e.hangTime||'10')+'" oninput="updTmpl(\''+id+'\',\'hangTime\',this.value)"></div>'
+        +'<div class="field"><label>Sets</label><input type="number" value="'+esc(e.hangSets||'4')+'" oninput="updTmpl(\''+id+'\',\'hangSets\',this.value)"></div>'
+        +'<div class="field"><label>Reps</label><input type="number" value="'+esc(e.hangReps||'1')+'" oninput="updTmpl(\''+id+'\',\'hangReps\',this.value)"></div>'
+        +'</div>';
+    } else {
+      html+='<div style="font-size:12px;color:var(--muted)">'+t+' — no defaults needed</div>';
+    }
+    html+='</div>';
+  });
+  cont.innerHTML=html;
+}
+
+async function saveTemplate(){
+  var name=document.getElementById('tmpl-name').value.trim();
+  if(!name){toast('Enter a template name','err');return;}
+  if(!S_TMPL_ENTRIES.length){toast('Add exercises to template','err');return;}
+  var{error}=await sb.from('templates').insert({user_id:user.id,name,entries:JSON.stringify(S_TMPL_ENTRIES)});
+  if(error){toast('Error: '+error.message,'err');return;}
+  toast('Template saved','ok');
+  document.getElementById('tmpl-name').value='';
+  S_TMPL_ENTRIES=[];
+  renderTmplSelected();
+  loadTemplates();
+}
+
+async function loadTemplates(){
+  var{data}=await sb.from('templates').select('*').eq('user_id',user.id).order('created_at',{ascending:false});
+  var cont=document.getElementById('tmpl-list');
+  if(!data||!data.length){cont.innerHTML='<div class="empty" style="padding:20px"><div class="empty-icon">📋</div>No templates yet</div>';return;}
+  var html='';
+  data.forEach(function(t){
+    var entries=[];try{entries=JSON.parse(t.entries)||[];}catch(e){}
+    html+='<div class="card" style="display:flex;justify-content:space-between;align-items:center">'
+      +'<div><div style="font-weight:500;margin-bottom:4px">'+esc(t.name)+'</div>'
+      +'<div style="font-size:12px;color:var(--muted)">'+entries.map(function(e){return e.exercise_name;}).join(', ')+'</div>'
+      +'</div>'
+      +'<div class="btn-group">'
+      +'<button class="btn btn-sm btn-primary" onclick="loadTemplate('+JSON.stringify(t.id)+')">Load</button>'
+      +'<button class="btn-danger" onclick="deleteTemplate('+JSON.stringify(t.id)+')">✕</button>'
+      +'</div>'
+      +'</div>';
+  });
+  cont.innerHTML=html;
+}
+
+async function loadTemplate(id){
+  var{data}=await sb.from('templates').select('*').eq('id',id).single();
+  if(!data)return;
+  var entries=[];try{entries=JSON.parse(data.entries)||[];}catch(e){}
+  S.entries=entries.map(function(e){return Object.assign({},e,{id:uid(),_prev:[]});});
+  renderEntries();
+  saveDraft();
+  switchTab('log',document.querySelector('nav button'));
+  document.querySelector('nav button').classList.add('active');
+  toast('Template loaded','ok');
+}
+
+async function deleteTemplate(id){
+  if(!confirm('Delete template?'))return;
+  await sb.from('templates').delete().eq('id',id);
+  toast('Deleted','ok');
+  loadTemplates();
+}
+
 </script>
 </body>
 </html>
