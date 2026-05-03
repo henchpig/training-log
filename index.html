@@ -125,6 +125,8 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
 .chip-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;max-height:180px;overflow-y:auto}
 .chip{padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;cursor:pointer;transition:all .12s;white-space:nowrap;font-family:var(--sans)}
 .chip:hover{background:var(--surface3);border-color:var(--border2)}
+.mp-chip{padding:5px 10px;border-radius:16px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:12px;cursor:pointer;user-select:none;transition:all .12s}
+.mp-chip.selected{background:rgba(78,205,196,.15);border-color:var(--green);color:var(--green)}
 .chip.active-chip{background:var(--green);color:#000;border-color:var(--green)}
 .section-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:500}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px 18px;font-size:13px;opacity:0;transition:all .25s;pointer-events:none;z-index:999;white-space:nowrap}
@@ -357,15 +359,7 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
             <option value="rehab">rehab</option>
           </select>
         </div>
-        <div class="field"><label>Type</label>
-          <select id="new-type">
-            <option value="lifting">lifting</option>
-            <option value="finger_training">finger training</option>
-            <option value="climbing">climbing</option>
-            <option value="endurance_laps">endurance laps</option>
-            <option value="cardio">cardio</option>
-          </select>
-        </div>
+
       </div>
       <div class="finger-extra" id="finger-extra" style="display:none">
         <div class="field-row">
@@ -387,13 +381,13 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
         <div class="field full">
           <label>Movement pattern (select multiple)</label>
           <div id="mp-checkboxes" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="push" style="width:auto;margin:0"> Push</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="pull" style="width:auto;margin:0"> Pull</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="hinge" style="width:auto;margin:0"> Hinge</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="squat" style="width:auto;margin:0"> Squat</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="anterior_core" style="width:auto;margin:0"> Anterior core</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="posterior_core" style="width:auto;margin:0"> Posterior core</label>
-            <label style="display:flex;align-items:center;gap:4px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer"><input type="checkbox" value="finger_training" style="width:auto;margin:0"> Finger training</label>
+            <span class="mp-chip" data-val="push" onclick="toggleMpChip(this)">Push</span>
+            <span class="mp-chip" data-val="pull" onclick="toggleMpChip(this)">Pull</span>
+            <span class="mp-chip" data-val="hinge" onclick="toggleMpChip(this)">Hinge</span>
+            <span class="mp-chip" data-val="squat" onclick="toggleMpChip(this)">Squat</span>
+            <span class="mp-chip" data-val="anterior_core" onclick="toggleMpChip(this)">Anterior core</span>
+            <span class="mp-chip" data-val="posterior_core" onclick="toggleMpChip(this)">Posterior core</span>
+            <span class="mp-chip" data-val="finger_training" onclick="toggleMpChip(this)">Finger training</span>
           </div>
         </div>
       </div>
@@ -520,7 +514,7 @@ async function loadExercises() {
 }
 function refreshAC(){var e=S.exercises;function uniq(a){return[...new Set(a.filter(Boolean))].sort();}S.acVals={names:uniq(e.map(function(x){return x.name;})),grips:uniq(e.map(function(x){return x.grip;})),lift_types:uniq(e.map(function(x){return x.lift_type;})),workout_types:uniq(e.map(function(x){return x.workout_type;}))};}
 function onCatChange(){var cat=document.getElementById('new-cat').value;document.getElementById('finger-extra').style.display=cat==='finger_training'?'block':'none';document.getElementById('new-type').value=cat==='finger_training'?'finger_training':(CAT_TYPE[cat]||'lifting');}
-async function addExercise(){var name=document.getElementById('new-name').value.trim();if(!name){toast('Enter a name','err');return;}if(S.exercises.find(function(e){return e.name.toLowerCase()===name.toLowerCase();})){toast('Already exists','err');return;}var mpChecked=[...document.querySelectorAll('#mp-checkboxes input:checked')].map(function(c){return c.value;});var row={user_id:user.id,name,category:document.getElementById('new-cat').value,stimulus:document.getElementById('new-stim').value,type:document.getElementById('new-type').value,grip:document.getElementById('new-grip')?.value||null,lift_type:document.getElementById('new-ltype')?.value||null,workout_type:document.getElementById('new-wtype')?.value||null,movement_pattern:mpChecked.length?mpChecked.join(','):null};var{error}=await sb.from('exercises').insert(row);if(error){toast('Error: '+error.message,'err');return;}toast('Added','ok');document.getElementById('new-name').value='';['new-grip','new-ltype','new-wtype'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});document.querySelectorAll('#mp-checkboxes input').forEach(function(c){c.checked=false;});await loadExercises();renderExList();}
+async function addExercise(){var name=document.getElementById('new-name').value.trim();if(!name){toast('Enter a name','err');return;}if(S.exercises.find(function(e){return e.name.toLowerCase()===name.toLowerCase();})){toast('Already exists','err');return;}var mpChecked=[...document.querySelectorAll('#mp-checkboxes .mp-chip.selected')].map(function(c){return c.dataset.val;});var _cat=document.getElementById('new-cat').value;var _type=CAT_TYPE[_cat]||'lifting';var row={user_id:user.id,name,category:_cat,stimulus:document.getElementById('new-stim').value,type:_type,grip:document.getElementById('new-grip')?.value||null,lift_type:document.getElementById('new-ltype')?.value||null,workout_type:document.getElementById('new-wtype')?.value||null,movement_pattern:mpChecked.length?mpChecked.join(','):null};var{error}=await sb.from('exercises').insert(row);if(error){toast('Error: '+error.message,'err');return;}toast('Added','ok');document.getElementById('new-name').value='';['new-grip','new-ltype','new-wtype'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});document.querySelectorAll('#mp-checkboxes .mp-chip').forEach(function(c){c.classList.remove('selected');});await loadExercises();renderExList();}
 async function deleteExercise(id){if(!confirm('Remove exercise?'))return;await sb.from('exercises').delete().eq('id',id);toast('Removed','ok');await loadExercises();renderExList();}
 function renderExList(){
   var cat=document.getElementById('ex-cat-filter').value,q=(document.getElementById('ex-search').value||'').toLowerCase();
@@ -559,7 +553,7 @@ function renderExList(){
           +'</div>'
           +'<div><div class="lbl" style="margin-bottom:6px">Movement pattern</div>'
           +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
-          +MPs.map(function(mp){return'<label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text);cursor:pointer"><input type="checkbox" value="'+mp+'"'+(mpVals.indexOf(mp)>=0?' checked':'')+' style="width:auto;margin:0"> '+mp.replace('_',' ')+'</label>';}).join('')
+          +MPs.map(function(mp){return'<span class="mp-chip'+(mpVals.indexOf(mp)>=0?' selected':'')+' " data-val="'+mp+'" onclick="toggleMpChip(this)">'+mp.replace('_',' ')+'</span>';}).join('')
           +'</div></div>'
           +'<div class="btn-group"><button class="btn btn-sm btn-primary" onclick="saveExEdit(\''+ex.id+'\')">Save</button><button class="btn btn-sm" onclick="S.editExId=null;renderExList()">Cancel</button><button class="btn-danger" onclick="deleteExercise(\''+ex.id+'\')">Delete</button></div>'
           +'</div>';
@@ -574,7 +568,7 @@ function renderExList(){
 }
 
 async function saveExEdit(id){
-  var mpChecked=[...document.querySelectorAll('.ex-row input[type=checkbox]:checked')].map(function(c){return c.value;});
+  var mpChecked=[...document.querySelectorAll('.ex-row .mp-chip.selected')].map(function(c){return c.dataset.val;});
   var updates={
     name:document.getElementById('edit-ex-name').value.trim(),
     category:document.getElementById('edit-ex-cat').value,
@@ -1146,6 +1140,8 @@ function fmtCompact(s,t){
 }
 function toast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+(type||'');setTimeout(function(){t.classList.remove('show');},2500);}
 // ── DRAFT AUTOSAVE ────────────────────────────────────────────
+function toggleMpChip(el){el.classList.toggle('selected');}
+
 function saveDraft(){
   try{
     localStorage.setItem('tl_draft',JSON.stringify({
