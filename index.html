@@ -974,13 +974,13 @@ async function loadChart(){
   // For lifting and finger training — dual Y axis
   if(t==='lifting'||t==='finger_training'){
     var byDate={};
-    (sets||[]).forEach(function(s){var e=em[s.entry_id];if(!e)return;var d=e.sessions?.date;if(!d)return;if(!byDate[d])byDate[d]={loads:[],reps:[],hangTimes:[],hangReps:[]};if(s.load)byDate[d].loads.push(parseFloat(s.load));if(s.reps)byDate[d].reps.push(parseFloat(s.reps));if(s.hang_time)byDate[d].hangTimes.push(parseFloat(s.hang_time));if(s.hang_reps)byDate[d].hangReps.push(parseFloat(s.hang_reps));});
+    (sets||[]).forEach(function(s){var e=em[s.entry_id];if(!e)return;var d=e.sessions?.date;if(!d)return;if(!byDate[d])byDate[d]={loads:[],reps:[],hangTimes:[],hangSets:[]};if(s.load)byDate[d].loads.push(parseFloat(s.load));if(s.reps)byDate[d].reps.push(parseFloat(s.reps));if(s.hang_time)byDate[d].hangTimes.push(parseFloat(s.hang_time));if(s.hang_sets)byDate[d].hangSets.push(parseFloat(s.hang_sets));});
     var dates=Object.keys(byDate).sort();
     if(!dates.length){document.getElementById('prog-empty').style.display='block';return;}
     var loadPts=dates.map(function(d){return{x:d,y:Math.max.apply(null,byDate[d].loads)||null};});
     var repPts=t==='lifting'?dates.map(function(d){var r=byDate[d].reps;return{x:d,y:r.length?r.reduce(function(a,b){return a+b;},0)/r.length:null};}):null;
     var hangPts=t==='finger_training'?dates.map(function(d){return{x:d,y:byDate[d].hangTimes[0]||null};}):null;
-    var hangRepPts=t==='finger_training'?dates.map(function(d){return{x:d,y:byDate[d].hangReps[0]||null};}):null;
+    var hangRepPts=t==='finger_training'?dates.map(function(d){return{x:d,y:byDate[d].hangSets[0]||null};}):null;
     renderDualChart(loadPts,repPts,hangPts,hangRepPts,ex.name,t);
     return;
   }
@@ -1016,7 +1016,7 @@ function renderDualChart(loadPts,repPts,hangPts,hangRepPts,title,type){
   }
   // Hang reps dataset (finger only)
   if(hangRepPts&&hangRepPts.some(function(p){return p.y!==null;})){
-    datasets.push({label:'Reps',data:hangRepPts,borderColor:'#fd79a8',backgroundColor:'rgba(253,121,168,0.0)',borderWidth:0,pointRadius:5,pointBackgroundColor:'#fd79a8',pointStyle:'star',type:'scatter',yAxisID:'yHangReps',showLine:false});
+    datasets.push({label:'Sets',data:hangRepPts,borderColor:'#fd79a8',backgroundColor:'rgba(253,121,168,0.0)',borderWidth:0,pointRadius:8,pointBackgroundColor:'#fd79a8',pointStyle:'rectRot',type:'scatter',yAxisID:'yHangReps',showLine:false});
     yAxes.yHangReps={type:'linear',position:'right',grid:{drawOnChartArea:false},ticks:{color:'#fd79a8',font:{family:'IBM Plex Mono',size:10}},title:{display:true,text:'Sets',color:'#fd79a8',font:{size:10}}};
   }
 
