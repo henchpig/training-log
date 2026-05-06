@@ -884,7 +884,8 @@ function showDetail(sid){
     if(e.exercise_type==='endurance_laps'){
       (e.sets||[]).sort(function(a,b){return(a.set_number||0)-(b.set_number||0);}).forEach(function(st,j){html+='<div class="detail-set">Set '+(j+1)+': <span>'+esc(st.grade||'')+'</span> <span style="color:var(--muted)">'+esc(st.result||'')+'</span></div>';});
     } else {
-      (e.sets||[]).forEach(function(st,j){html+='<div class="detail-set">Set '+(j+1)+': <span>'+fmtCompact(st,e.exercise_type)+'</span>'+(st.climb_notes?'<span style="color:var(--muted);font-style:italic;margin-left:6px">'+esc(st.climb_notes)+'</span>':'')+'</div>';});
+      var setLabel={'lifting':'Set','climbing':'Climb','endurance_laps':'Lap','finger_training':'Hang','cardio':'Session'}[e.exercise_type]||'Set';
+      (e.sets||[]).forEach(function(st,j){html+='<div class="detail-set">'+setLabel+' '+(j+1)+': <span>'+fmtCompact(st,e.exercise_type)+'</span>'+(st.climb_notes?'<span style="color:var(--muted);font-style:italic;margin-left:6px">'+esc(st.climb_notes)+'</span>':'')+'</div>';});
     }
     if(e.notes)html+='<div class="detail-notes">'+esc(e.notes)+'</div>';
     html+='</div>';
@@ -976,14 +977,15 @@ async function loadChart(){
   // For lifting and finger training — dual Y axis
   if(t==='lifting'||t==='finger_training'){
     var byDate={};
-    (sets||[]).forEach(function(s){var e=em[s.entry_id];if(!e)return;var d=e.sessions?.date;if(!d)return;if(!byDate[d])byDate[d]={loads:[],reps:[],hangTimes:[],hangSets:[]};if(s.load)byDate[d].loads.push(parseFloat(s.load));if(s.reps)byDate[d].reps.push(parseFloat(s.reps));if(s.hang_time)byDate[d].hangTimes.push(parseFloat(s.hang_time));if(s.hang_sets)byDate[d].hangSets.push(parseFloat(s.hang_sets));});
+    (sets||[]).forEach(function(s){var e=em[s.entry_id];if(!e)return;var d=e.sessions?.date;if(!d)return;if(!byDate[d])byDate[d]={loads:[],reps:[],hangTimes:[],hangSets:[],setSums:[]};if(s.load)byDate[d].loads.push(parseFloat(s.load));if(s.reps)byDate[d].reps.push(parseFloat(s.reps));if(s.hang_time)byDate[d].hangTimes.push(parseFloat(s.hang_time));if(s.hang_sets)byDate[d].hangSets.push(parseFloat(s.hang_sets));if(s.reps&&s.load)byDate[d].setSums.push(1);});
     var dates=Object.keys(byDate).sort();
     if(!dates.length){document.getElementById('prog-empty').style.display='block';return;}
-    var loadPts=dates.map(function(d){var ls=byDate[d].loads;var max=ls.length?Math.max.apply(null,ls):null;var min=ls.length?Math.min.apply(null,ls):null;var total=ls.reduce(function(a,b){return a+b;},0);var cnt=ls.length;var detail=ls.reduce(function(acc,v){acc[v]=(acc[v]||0)+1;return acc;},{});return{x:d,y:max,yMin:min,loads:ls,loadDetail:detail,totalSets:cnt};});
+    var loadPts=dates.map(function(d){var ls=byDate[d].loads;var max=ls.length?Math.max.apply(null,ls):null;var min=ls.length?Math.min.apply(null,ls):null;var detail=ls.reduce(function(acc,v){var k=v.toFixed(1);acc[k]=(acc[k]||0)+1;return acc;},{});var totalSets=byDate[d].hangSets.length?byDate[d].hangSets.reduce(function(a,b){return a+b;},0):byDate[d].setSums.reduce(function(a,b){return a+b;},0);return{x:d,y:max,yMin:min,loads:ls,loadDetail:detail,totalSets:totalSets};});
     var repPts=t==='lifting'?dates.map(function(d){var r=byDate[d].reps;return{x:d,y:r.length?r.reduce(function(a,b){return a+b;},0)/r.length:null};}):null;
     var hangPts=t==='finger_training'?dates.map(function(d){return{x:d,y:byDate[d].hangTimes[0]||null};}):null;
-    var hangRepPts=t==='finger_training'?dates.map(function(d){var ss=byDate[d].hangSets;return{x:d,y:ss.reduce(function(a,b){return a+b;},0)||null};}):null;
-    renderDualChart(loadPts,repPts,hangPts,hangRepPts,ex.name,t);
+    var hangRepPts=t==='finger_training'?dates.map(function(d){var ss=byDate[d].hangSets;return{x:d,y:ss.length?ss.reduce(function(a,b){return a+b;},0):null};}):null;
+    var liftSetPts=t==='lifting'?dates.map(function(d){var ss=byDate[d].setSums;return{x:d,y:ss.length?ss.reduce(function(a,b){return a+b;},0):null};}):null;
+    renderDualChart(loadPts,repPts,hangPts,hangRepPts,liftSetPts,dates,ex.name,t);
     return;
   }
 
@@ -992,55 +994,49 @@ async function loadChart(){
   (sets||[]).forEach(function(s){var e=em[s.entry_id];if(!e)return;var d=e.sessions?.date;if(!d)return;var v=parseFloat(s.duration_min);if(!isNaN(v)&&v)pts2.push({date:d,value:v});});
   pts2.sort(function(a,b){return a.date.localeCompare(b.date);});
   if(!pts2.length){document.getElementById('prog-empty').style.display='block';return;}
+  var dates2=pts2.map(function(p){return p.date;});
   var loadPts2=pts2.map(function(p){return{x:p.date,y:p.value};});
-  renderDualChart(loadPts2,null,null,null,ex.name,'cardio');
+  renderDualChart(loadPts2,null,null,null,null,dates2,ex.name,'cardio');
 }
 
-function padAxis(vals,pct){var mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals),pad=(mx-mn)*pct||mx*pct||1;return{min:Math.floor(mn-pad),max:Math.ceil(mx+pad)};}
+function padAxis(vals,pct){var mn=Math.min.apply(null,vals.filter(function(v){return v!==null&&!isNaN(v);})),mx=Math.max.apply(null,vals.filter(function(v){return v!==null&&!isNaN(v);})),pad=(mx-mn)*pct||mx*pct||1;return{min:Math.floor(mn-pad),max:Math.ceil(mx+pad)};}
 
-function renderDualChart(loadPts,repPts,hangPts,hangRepPts,title,type){
+function renderDualChart(loadPts,repPts,hangPts,hangRepPts,liftSetPts,labels,title,type){
   var datasets=[];
   var yAxes={};
+  var sortedLabels=(labels||[]).slice().sort();
 
-  // Load dataset with range bar for multi-load sessions
+  // Load dataset with range bar
   if(loadPts&&loadPts.some(function(p){return p.y!==null;})){
     var trend=calcTrend(loadPts.map(function(p){return p.y||0;}));
     var loadVals=loadPts.map(function(p){return p.y||0;}).concat(loadPts.map(function(p){return p.yMin||p.y||0;}));
     var loadPad=padAxis(loadVals,0.12);
-
-    // Range bars — vertical lines from min to max load per session
-    var rangePts=loadPts.filter(function(p){return p.yMin!==null&&p.yMin!==p.y;}).map(function(p){return[{x:p.x,y:p.y},{x:p.x,y:p.yMin}];});
-    rangePts.forEach(function(pair){
-      datasets.push({label:'_range',data:pair,borderColor:'rgba(78,205,196,0.3)',borderWidth:2,pointRadius:0,fill:false,yAxisID:'yLoad',showLine:true,tension:0});
+    // Range bars for multi-load sessions
+    loadPts.filter(function(p){return p.yMin!==null&&p.yMin!==p.y;}).forEach(function(p){
+      datasets.push({label:'_range',data:[{x:p.x,y:p.y},{x:p.x,y:p.yMin}],borderColor:'rgba(78,205,196,0.3)',borderWidth:2,pointRadius:0,fill:false,yAxisID:'yLoad',showLine:true,tension:0,order:10});
     });
-
-    datasets.push({label:'Load (lb)',data:loadPts,borderColor:'#4ecdc4',backgroundColor:'rgba(78,205,196,0.06)',borderWidth:2,pointRadius:4,pointBackgroundColor:'#4ecdc4',tension:0.2,fill:true,yAxisID:'yLoad'});
-    datasets.push({label:'Trend',data:loadPts.map(function(p,i){return{x:p.x,y:trend[i]};}),borderColor:'rgba(78,205,196,0.3)',borderWidth:1.5,borderDash:[4,3],pointRadius:0,fill:false,yAxisID:'yLoad'});
+    datasets.push({label:'Load (lb)',data:loadPts,borderColor:'#4ecdc4',backgroundColor:'rgba(78,205,196,0.06)',borderWidth:2,pointRadius:4,pointBackgroundColor:'#4ecdc4',tension:0.2,fill:true,yAxisID:'yLoad',order:1});
+    datasets.push({label:'Trend',data:loadPts.map(function(p,i){return{x:p.x,y:trend[i]};}),borderColor:'rgba(78,205,196,0.25)',borderWidth:1.5,borderDash:[4,3],pointRadius:0,fill:false,yAxisID:'yLoad',order:2});
     yAxes.yLoad={type:'linear',position:'left',min:loadPad.min,max:loadPad.max,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#4ecdc4',font:{family:'IBM Plex Mono',size:10}},title:{display:true,text:'Load (lb)',color:'#4ecdc4',font:{size:10}}};
   }
-
-  // Reps dataset (lifting)
+  // Avg reps (lifting)
   if(repPts&&repPts.some(function(p){return p.y!==null;})){
-    var repVals=repPts.map(function(p){return p.y||0;});
-    var repPad=padAxis(repVals,0.2);
-    datasets.push({label:'Avg reps',data:repPts,borderColor:'#f7b731',backgroundColor:'rgba(247,183,49,0.0)',borderWidth:0,pointRadius:5,pointBackgroundColor:'#f7b731',pointStyle:'triangle',type:'scatter',yAxisID:'yReps',showLine:false});
+    var repPad=padAxis(repPts.map(function(p){return p.y||0;}),0.25);
+    datasets.push({label:'Avg reps',data:repPts,borderColor:'#f7b731',borderWidth:0,pointRadius:5,pointBackgroundColor:'#f7b731',pointStyle:'triangle',type:'scatter',yAxisID:'yReps',showLine:false,order:3});
     yAxes.yReps={type:'linear',position:'right',min:repPad.min,max:repPad.max,grid:{drawOnChartArea:false},ticks:{color:'#f7b731',font:{family:'IBM Plex Mono',size:10}},title:{display:true,text:'Avg reps',color:'#f7b731',font:{size:10}}};
   }
-
-  // Hang time dataset (finger)
+  // Hang time (finger)
   if(hangPts&&hangPts.some(function(p){return p.y!==null;})){
-    var hangVals=hangPts.map(function(p){return p.y||0;});
-    var hangPad=padAxis(hangVals,0.2);
-    datasets.push({label:'Hang time (s)',data:hangPts,borderColor:'#a29bfe',backgroundColor:'rgba(162,155,254,0.0)',borderWidth:0,pointRadius:5,pointBackgroundColor:'#a29bfe',pointStyle:'rect',type:'scatter',yAxisID:'yHang',showLine:false});
+    var hangPad=padAxis(hangPts.map(function(p){return p.y||0;}),0.25);
+    datasets.push({label:'Hang time (s)',data:hangPts,borderColor:'#a29bfe',borderWidth:0,pointRadius:6,pointBackgroundColor:'#a29bfe',pointStyle:'rect',type:'scatter',yAxisID:'yHang',showLine:false,order:4});
     yAxes.yHang={type:'linear',position:'right',min:hangPad.min,max:hangPad.max,grid:{drawOnChartArea:false},ticks:{color:'#a29bfe',font:{family:'IBM Plex Mono',size:10}},title:{display:true,text:'Hang (s)',color:'#a29bfe',font:{size:10}}};
   }
-
-  // Sets dataset (finger only)
-  if(hangRepPts&&hangRepPts.some(function(p){return p.y!==null;})){
-    var setVals=hangRepPts.map(function(p){return p.y||0;});
-    var setPad=padAxis(setVals,0.25);
-    datasets.push({label:'Sets',data:hangRepPts,borderColor:'#fd79a8',backgroundColor:'rgba(253,121,168,0.0)',borderWidth:0,pointRadius:8,pointBackgroundColor:'#fd79a8',pointStyle:'rectRot',type:'scatter',yAxisID:'yHangReps',showLine:false});
-    yAxes.yHangReps={type:'linear',position:'right',min:setPad.min,max:setPad.max,grid:{drawOnChartArea:false},ticks:{color:'#fd79a8',font:{family:'IBM Plex Mono',size:10}},title:{display:true,text:'Sets',color:'#fd79a8',font:{size:10}}};
+  // Sets — finger hang_sets or lifting total sets
+  var setsPts=hangRepPts||liftSetPts;
+  if(setsPts&&setsPts.some(function(p){return p.y!==null;})){
+    var setPad=padAxis(setsPts.map(function(p){return p.y||0;}),0.3);
+    datasets.push({label:'Sets',data:setsPts,borderColor:'#fd79a8',borderWidth:0,pointRadius:8,pointBackgroundColor:'#fd79a8',pointStyle:'rectRot',type:'scatter',yAxisID:'yHangReps',showLine:false,order:5});
+    yAxes.yHangReps={type:'linear',position:'right',min:setPad.min,max:setPad.max,grid:{drawOnChartArea:false},ticks:{color:'#fd79a8',font:{family:'IBM Plex Mono',size:10},stepSize:1},title:{display:true,text:'Sets',color:'#fd79a8',font:{size:10}}};
   }
 
   document.getElementById('prog-title').textContent=title;
@@ -1049,15 +1045,17 @@ function renderDualChart(loadPts,repPts,hangPts,hangRepPts,title,type){
     '<span style="color:#4ecdc4">● load</span>'
     +(repPts?'<span style="color:#f7b731">▲ avg reps</span>':'')
     +(hangPts?'<span style="color:#a29bfe">■ hang time</span>':'')
-    +(hangRepPts?'<span style="color:#fd79a8">◆ sets</span>':'');
-  var latest=loadPts[loadPts.length-1]?.y,first=loadPts[0]?.y,delta=latest&&first?parseFloat((latest-first).toFixed(1)):0;
+    +(setsPts?'<span style="color:#fd79a8">◆ sets</span>':'');
+  var latest=loadPts&&loadPts.length?loadPts[loadPts.length-1]?.y:null;
+  var first=loadPts&&loadPts.length?loadPts[0]?.y:null;
+  var delta=latest&&first?parseFloat((latest-first).toFixed(1)):0;
   var sEl=document.getElementById('prog-stats');sEl.style.display='grid';
-  sEl.innerHTML=[{l:'Sessions',v:loadPts.length},{l:'Latest load',v:latest?latest+'lb':'—'},{l:'Change',v:latest&&first?(delta>=0?'+':'')+delta+'lb':'—'}].map(function(s){return'<div class="stat"><div class="stat-val">'+s.v+'</div><div class="stat-lbl">'+s.l+'</div></div>';}).join('');
+  sEl.innerHTML=[{l:'Sessions',v:loadPts?loadPts.length:'—'},{l:'Latest load',v:latest?latest+'lb':'—'},{l:'Change',v:latest&&first?(delta>=0?'+':'')+delta+'lb':'—'}].map(function(s){return'<div class="stat"><div class="stat-val">'+s.v+'</div><div class="stat-lbl">'+s.l+'</div></div>';}).join('');
 
   if(S.chart)S.chart.destroy();
   S.chart=new Chart(document.getElementById('prog-chart'),{
     type:'line',
-    data:{datasets},
+    data:{labels:sortedLabels,datasets:datasets},
     options:{
       responsive:true,maintainAspectRatio:false,
       parsing:{xAxisKey:'x',yAxisKey:'y'},
@@ -1066,15 +1064,14 @@ function renderDualChart(loadPts,repPts,hangPts,hangRepPts,title,type){
         tooltip:{
           callbacks:{
             label:function(c){
-              if(c.dataset.label==='_range')return null;
+              if(c.dataset.label==='_range'||c.dataset.label==='Trend')return null;
               if(c.dataset.label==='Load (lb)'){
                 var pt=c.raw;
-                var lines=[c.dataset.label+': '+c.parsed.y.toFixed(1)+'lb'];
-                if(pt.loadDetail){
-                  var detail=Object.keys(pt.loadDetail).map(function(k){return k+'lb ×'+pt.loadDetail[k];}).join(', ');
-                  lines.push('Loads: '+detail);
-                  lines.push('Total sets: '+pt.totalSets);
+                var lines=['Max load: '+c.parsed.y.toFixed(1)+'lb'];
+                if(pt.loadDetail&&Object.keys(pt.loadDetail).length>1){
+                  lines.push('Breakdown: '+Object.keys(pt.loadDetail).map(function(k){return k+'lb ×'+pt.loadDetail[k];}).join(', '));
                 }
+                if(pt.totalSets)lines.push('Total sets: '+pt.totalSets);
                 return lines;
               }
               return c.dataset.label+': '+c.parsed.y?.toFixed(1);
@@ -1083,34 +1080,38 @@ function renderDualChart(loadPts,repPts,hangPts,hangRepPts,title,type){
           }
         }
       },
-      scales:Object.assign({x:{type:'category',grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#666',font:{family:'IBM Plex Mono',size:10},maxRotation:45,autoSkip:true,maxTicksLimit:8}}},yAxes)
+      scales:Object.assign({x:{type:'category',labels:sortedLabels,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#666',font:{family:'IBM Plex Mono',size:10},maxRotation:45,autoSkip:true,maxTicksLimit:8}}},yAxes)
     }
   });
 }
 
 function renderBoulderChart(pts,title){
-  // Scatter: color by result
   var sentPts=pts.filter(function(p){return p.result==='sent'||p.result==='flash';}).map(function(p){return{x:p.date,y:p.value,grade:p.grade};});
   var attPts=pts.filter(function(p){return p.result==='attempt'||p.result==='project';}).map(function(p){return{x:p.date,y:p.value,grade:p.grade};});
   var allDates=[...new Set(pts.map(function(p){return p.date;}))].sort();
+  // Get unique grade values for Y axis ticks
+  var gradeVals=[...new Set(pts.map(function(p){return p.value;}))].filter(Boolean).sort(function(a,b){return a-b;});
+  var allVals=pts.map(function(p){return p.value;}).filter(Boolean);
+  var yMin=Math.min.apply(null,allVals)-1;
+  var yMax=Math.max.apply(null,allVals)+1;
 
   document.getElementById('prog-title').textContent=title+' — grade progression';
   document.getElementById('prog-chart-card').style.display='block';
-  document.getElementById('prog-legend').innerHTML='<span style="color:#4ecdc4">● sent / flash</span><span style="color:#444">● attempt</span>';
+  document.getElementById('prog-legend').innerHTML='<span style="color:#4ecdc4">● sent / flash</span><span style="color:rgba(255,255,255,0.3)">● attempt</span>';
   document.getElementById('prog-stats').style.display='none';
 
   if(S.chart)S.chart.destroy();
   S.chart=new Chart(document.getElementById('prog-chart'),{
     type:'scatter',
     data:{datasets:[
-      {label:'Sent/Flash',data:sentPts,backgroundColor:'#4ecdc4',pointRadius:6,pointHoverRadius:8},
-      {label:'Attempt',data:attPts,backgroundColor:'rgba(255,255,255,0.15)',pointRadius:5,pointHoverRadius:7}
+      {label:'Sent/Flash',data:sentPts,backgroundColor:'#4ecdc4',pointRadius:6,pointHoverRadius:9,order:1},
+      {label:'Attempt',data:attPts,backgroundColor:'rgba(255,255,255,0.2)',pointRadius:4,pointHoverRadius:6,order:2}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return(c.dataset.label||'')+': '+(c.raw.grade||c.parsed.y);}}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return(c.dataset.label||'')+': '+(c.raw.grade||numToGrade(c.parsed.y));}}}},
       scales:{
         x:{type:'category',labels:allDates,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#666',font:{family:'IBM Plex Mono',size:10},maxRotation:45,autoSkip:true,maxTicksLimit:10}},
-        y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#666',font:{family:'IBM Plex Mono',size:10},callback:function(v){return numToGrade(v);}}}
+        y:{min:yMin,max:yMax,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#666',font:{family:'IBM Plex Mono',size:10},stepSize:1,callback:function(v){var g=numToGrade(Math.round(v));return g===String(Math.round(v))?null:g;}}}
       }}
   });
 }
@@ -1221,7 +1222,7 @@ function gradeNum(g){if(!g)return 0;var s=g.toString().trim();
   var y=s.match(/^5\.(\d+)([a-d]?)$/i);if(y){return parseInt(y[1])*4+({'':'0','a':'0','b':'1','c':'2','d':'3'}[y[2].toLowerCase()]||0);}
   var v=s.match(/^[vV](\d+)$/);if(v)return parseInt(v[1])+200;
   return{'6a':300,'6a+':301,'6b':302,'6b+':303,'6c':304,'6c+':305,'7a':306,'7a+':307,'7b':308,'8a':312}[s.toLowerCase()]||0;}
-function numToGrade(n){var yds=GRADE_SEQ.find(function(g){return gradeNum(g)===Math.round(n);});return yds||String(n);}
+function numToGrade(n){var r=Math.round(n);if(r>=200&&r<300)return'V'+(r-200);if(r>=300){var font={'300':'6A','301':'6A+','302':'6B','303':'6B+','304':'6C','305':'6C+','306':'7A','307':'7A+','308':'7B','312':'8A'};return font[String(r)]||null;}var yds=GRADE_SEQ.find(function(g){return gradeNum(g)===r;});return yds||null;}
 function primVal(s,t){if(t==='lifting'||t==='finger_training')return parseFloat(s.load)||null;if(t==='climbing'||t==='endurance_laps')return gradeNum(s.grade)||null;if(t==='cardio')return parseFloat(s.duration_min)||null;return null;}
 function fmtCompact(s,t){
   if(t==='lifting'){var p=[];if(s.load)p.push(s.load+'lb');if(s.reps)p.push('×'+s.reps);if(s.rir)p.push(s.rir+' RIR');if(s.rpe)p.push('RPE'+s.rpe);return p.join(' ')||'—';}
