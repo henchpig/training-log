@@ -608,8 +608,7 @@ async function renderRecency(){
       if(!lastTrained[cat])lastTrained[cat]=s.date;
     });
   });
-  var today=new Date();
-  today.setHours(0,0,0,0);
+  var today=new Date().toLocaleDateString('en-CA');
   var html='<div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:10px">';
   modalities.forEach(function(m){
     var last=lastTrained[m];
@@ -617,8 +616,9 @@ async function renderRecency(){
     var text,color;
     if(!last){text='never';color='var(--muted)';}
     else{
-      var d=new Date(last);d.setHours(0,0,0,0);
-      var days=Math.round((today-d)/(1000*60*60*24));
+      var todayDate=new Date(today+'T12:00:00');
+      var lastDate=new Date(last+'T12:00:00');
+      var days=Math.round((todayDate-lastDate)/(1000*60*60*24));
       text=days===0?'today':days===1?'yesterday':days+' days ago';
       color=days<=t[0]?'var(--red)':days<=t[1]?'var(--amber)':'var(--green)';
     }
