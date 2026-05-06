@@ -977,10 +977,10 @@ async function loadChart(){
   // For lifting and finger training — dual Y axis
   if(t==='lifting'||t==='finger_training'){
     var byDate={};
-    (sets||[]).forEach(function(s){var e=em[s.entry_id];if(!e)return;var d=e.sessions?.date;if(!d)return;if(!byDate[d])byDate[d]={loads:[],reps:[],hangTimes:[],hangSets:[],setSums:[]};if(s.load)byDate[d].loads.push(parseFloat(s.load));if(s.reps)byDate[d].reps.push(parseFloat(s.reps));if(s.hang_time)byDate[d].hangTimes.push(parseFloat(s.hang_time));if(s.hang_sets)byDate[d].hangSets.push(parseFloat(s.hang_sets));if(s.reps&&s.load)byDate[d].setSums.push(1);});
+    (sets||[]).forEach(function(s){var e=em[s.entry_id];if(!e)return;var d=e.sessions?.date;if(!d)return;if(!byDate[d])byDate[d]={loads:[],reps:[],hangTimes:[],hangSets:[],setSums:[],loadHangSets:{}};if(s.load)byDate[d].loads.push(parseFloat(s.load));if(s.reps)byDate[d].reps.push(parseFloat(s.reps));if(s.hang_time)byDate[d].hangTimes.push(parseFloat(s.hang_time));if(s.hang_sets){byDate[d].hangSets.push(parseFloat(s.hang_sets));var _lk=parseFloat(s.load).toFixed(1);byDate[d].loadHangSets[_lk]=(byDate[d].loadHangSets[_lk]||0)+parseFloat(s.hang_sets);}if(s.reps&&s.load)byDate[d].setSums.push(1);});
     var dates=Object.keys(byDate).sort();
     if(!dates.length){document.getElementById('prog-empty').style.display='block';return;}
-    var loadPts=dates.map(function(d){var ls=byDate[d].loads;var max=ls.length?Math.max.apply(null,ls):null;var min=ls.length?Math.min.apply(null,ls):null;var detail=ls.reduce(function(acc,v){var k=v.toFixed(1);acc[k]=(acc[k]||0)+1;return acc;},{});var totalSets=byDate[d].hangSets.length?byDate[d].hangSets.reduce(function(a,b){return a+b;},0):byDate[d].setSums.reduce(function(a,b){return a+b;},0);return{x:d,y:max,yMin:min,loads:ls,loadDetail:detail,totalSets:totalSets};});
+    var loadPts=dates.map(function(d){var ls=byDate[d].loads;var max=ls.length?Math.max.apply(null,ls):null;var min=ls.length?Math.min.apply(null,ls):null;var detail=ls.reduce(function(acc,v){var k=v.toFixed(1);acc[k]=(acc[k]||0)+1;return acc;},{});var isHang=byDate[d].hangSets.length>0;var totalSets=isHang?byDate[d].hangSets.reduce(function(a,b){return a+b;},0):byDate[d].setSums.reduce(function(a,b){return a+b;},0);return{x:d,y:max,yMin:min,loads:ls,loadDetail:detail,loadHangSets:byDate[d].loadHangSets,totalSets:totalSets,isHang:isHang};});
     var repPts=t==='lifting'?dates.map(function(d){var r=byDate[d].reps;return{x:d,y:r.length?r.reduce(function(a,b){return a+b;},0)/r.length:null};}):null;
     var hangPts=t==='finger_training'?dates.map(function(d){return{x:d,y:byDate[d].hangTimes[0]||null};}):null;
     var hangRepPts=t==='finger_training'?dates.map(function(d){var ss=byDate[d].hangSets;return{x:d,y:ss.length?ss.reduce(function(a,b){return a+b;},0):null};}):null;
@@ -1068,7 +1068,11 @@ function renderDualChart(loadPts,repPts,hangPts,hangRepPts,liftSetPts,labels,tit
               if(c.dataset.label==='Load (lb)'){
                 var pt=c.raw;
                 var lines=['Max load: '+c.parsed.y.toFixed(1)+'lb'];
-                if(pt.loadDetail&&Object.keys(pt.loadDetail).length>1){
+                if(pt.isHang){
+                  if(Object.keys(pt.loadHangSets||{}).length>1){
+                    lines.push('Breakdown: '+Object.keys(pt.loadHangSets).map(function(k){return k+'lb: '+pt.loadHangSets[k]+' sets';}).join(', '));
+                  }
+                } else if(pt.loadDetail&&Object.keys(pt.loadDetail).length>1){
                   lines.push('Breakdown: '+Object.keys(pt.loadDetail).map(function(k){return k+'lb ×'+pt.loadDetail[k];}).join(', '));
                 }
                 if(pt.totalSets)lines.push('Total sets: '+pt.totalSets);
@@ -1111,7 +1115,7 @@ function renderBoulderChart(pts,title){
       plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return(c.dataset.label||'')+': '+(c.raw.grade||numToGrade(c.parsed.y));}}}},
       scales:{
         x:{type:'category',labels:allDates,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#666',font:{family:'IBM Plex Mono',size:10},maxRotation:45,autoSkip:true,maxTicksLimit:10}},
-        y:{min:yMin,max:yMax,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#666',font:{family:'IBM Plex Mono',size:10},stepSize:1,callback:function(v){var g=numToGrade(Math.round(v));return g===String(Math.round(v))?null:g;}}}
+        y:{min:yMin,max:yMax,grid:{color:'rgba(255,255,255,0.04)'},afterBuildTicks:function(axis){axis.ticks=gradeVals.map(function(v){return{value:v};});},ticks:{color:'#666',font:{family:'IBM Plex Mono',size:10},maxTicksLimit:10,callback:function(v){return numToGrade(Math.round(v));}}}
       }}
   });
 }
