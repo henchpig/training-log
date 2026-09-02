@@ -16,7 +16,7 @@ const METRICS = {
   max_hang: { load: 'Load', duration: 'Duration' },
   density_hang: { load: 'Load', duration: 'Duration' },
   repeaters: { load: 'Load', reps: 'Reps' },
-  touch_and_go: { load: 'Load', reps: 'Reps', work: 'Total Work' }
+  pulses: { load: 'Load', reps: 'Reps', work: 'Total Work' }
 };
 
 function defaultMetric(p) {

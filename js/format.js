@@ -35,7 +35,7 @@ export function entryLines(e) {
         if (e.protocol === 'repeaters') {
           return [`${head} — ${s.load ?? 0}lb, ${s.workSec ?? '–'}:${s.restSec ?? '–'} × ${s.reps ?? '–'}`];
         }
-        if (e.protocol === 'touch_and_go') {
+        if (e.protocol === 'pulses') {
           return [`${head} — ${s.load ?? 0}lb × ${s.reps ?? '–'}${s.rpe ? ` @ RPE ${s.rpe}` : ''}`];
         }
         return [head, ...(s.reps || []).map((r, ri) =>

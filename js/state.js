@@ -21,7 +21,7 @@ export const FINGER_PROTOCOLS = {
   max_hang: 'Max Hang',
   density_hang: 'Density Hang',
   repeaters: 'Repeaters',
-  touch_and_go: 'Touch-and-Go'
+  pulses: 'Pulses'
 };
 export const APPARATUS = {
   hb_bimanual: 'Hangboard (2 arms)',

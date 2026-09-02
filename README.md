@@ -93,7 +93,7 @@ round-trips, and every progress chart's config. Screenshots land in `test/screen
   where the number is load added to bodyweight — negative for assisted, blank for
   straight bodyweight. Bodyweight itself isn't tracked.
 - **Finger training has no library entries.** The protocol (Max Hang / Density Hang /
-  Repeaters / Touch-and-Go) plus per-set grip and apparatus fully describe the work,
+  Repeaters / Pulses) plus per-set grip and apparatus fully describe the work,
   so you pick the protocol directly when logging. Each protocol gets its own progress chart.
 - **Climbs aren't library items either.** Name is optional free text (autocompleting from
   your own history) — it's shorthand for your memory, not a tracked entity. Grade,

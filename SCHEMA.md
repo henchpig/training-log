@@ -58,7 +58,7 @@ sets: [{ workSec, restSec, reps, distance|null }]
 **category: 'finger'**
 ```
 exerciseId, exerciseName,
-protocol: 'max_hang' | 'density_hang' | 'repeaters' | 'touch_and_go',
+protocol: 'max_hang' | 'density_hang' | 'repeaters' | 'pulses',
 sets: [ ... shape depends on protocol, see below ]
 ```
 - `max_hang` / `density_hang` (share a shape — same data, different training intent):
@@ -66,7 +66,7 @@ sets: [ ... shape depends on protocol, see below ]
      reps: [{ load, durationSec, rpe }] }`
 - `repeaters`:
   `{ grip, apparatus, load, workSec, restSec, reps }`
-- `touch_and_go`:
+- `pulses` (pick the weight up and set it straight back down, for reps):
   `{ grip, apparatus, load, reps, rpe }`
 
 **category: 'boulder' | 'rope_redpoint'**
@@ -87,6 +87,6 @@ sets: [{ grade, laps, timeSec }]
 ## Progress queries
 - S&C / Cardio / Finger: `collectionGroup('entries').where('uid','==',uid).where('exerciseId','==',id)`,
   sorted client-side by `date`. Finger additionally filters by `protocol` (and optionally `grip`)
-  since Max Hang / Density Hang / Repeaters / Touch-and-Go are separate charts.
+  since Max Hang / Density Hang / Repeaters / Pulses are separate charts.
 - Boulder / Rope Redpoint / Rope Endurance: `collectionGroup('entries').where('uid','==',uid).where('category','==','boulder'|'rope_redpoint'|'rope_endurance')`,
   sorted client-side by `date`. Rope Endurance additionally flattens `sets` (one point per set).

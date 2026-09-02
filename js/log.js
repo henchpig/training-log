@@ -41,12 +41,12 @@ const intervalSet = () => ({ workSec: '', restSec: '', reps: '', distance: '' })
 const hangRep = () => ({ load: '', durationSec: '', rpe: '' });
 const hangSet = () => ({ grip: GRIPS[0], apparatus: 'hb_bimanual', restSec: '', reps: [hangRep()] });
 const repeaterSet = () => ({ grip: GRIPS[0], apparatus: 'hb_bimanual', load: '', workSec: '7', restSec: '3', reps: '' });
-const tngSet = () => ({ grip: GRIPS[0], apparatus: 'no_hang', load: '', reps: '', rpe: '' });
+const pulseSet = () => ({ grip: GRIPS[0], apparatus: 'no_hang', load: '', reps: '', rpe: '' });
 const lapSet = () => ({ grade: '', laps: '', timeSec: '' });
 
 function fingerSetFor(protocol) {
   if (protocol === 'repeaters') return repeaterSet();
-  if (protocol === 'touch_and_go') return tngSet();
+  if (protocol === 'pulses') return pulseSet();
   return hangSet();
 }
 
@@ -89,7 +89,7 @@ function normalizeEntry(e) {
           return { grip: s.grip, apparatus: s.apparatus, load: num(s.load),
             workSec: parseDuration(s.workSec), restSec: parseDuration(s.restSec), reps: num(s.reps) };
         }
-        if (e.protocol === 'touch_and_go') {
+        if (e.protocol === 'pulses') {
           return { grip: s.grip, apparatus: s.apparatus, load: num(s.load),
             reps: num(s.reps), rpe: num(s.rpe) };
         }
