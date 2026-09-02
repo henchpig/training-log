@@ -4,10 +4,10 @@
 //
 // Get these from: Firebase Console → Project settings → General → Your apps → Web app → SDK setup
 window.FIREBASE_CONFIG = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME.firebaseapp.com",
-  projectId: "REPLACE_ME",
-  storageBucket: "REPLACE_ME.appspot.com",
-  messagingSenderId: "REPLACE_ME",
-  appId: "REPLACE_ME"
+  apiKey: "AIzaSyATBUaGyNVYNiWt2FXgKc-KffIV2UJPTlc",
+  authDomain: "training-basecamp.firebaseapp.com",
+  projectId: "training-basecamp",
+  storageBucket: "training-basecamp.firebasestorage.app",
+  messagingSenderId: "829123056128",
+  appId: "1:829123056128:web:80927ad772450361ee7ee5"
 };
