@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    // Collection-group reads for the Progress tab (queries across all sessions'
+    // entries subcollections). Every entry doc carries a denormalized `uid` field.
+    match /{path=**}/entries/{entryId} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+  }
+}
