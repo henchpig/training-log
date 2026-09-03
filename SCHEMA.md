@@ -98,6 +98,7 @@ Boulder uses the V scale, rope full YDS (`5.9`, `5.12a`) — stored, displayed a
 picked the same way, with no translation layer.
 
 ## Redpoint pyramid
+Its own tab, rendered by `pyramid.js` from the `rope_redpoint` entries.
 `REDPOINT_PYRAMID` in `state.js` defines the tiers, apex first — 1× 5.13a, 2× 5.12d,
 4× 5.12c, 8× 5.12b, 10× 5.11d-or-5.12a. A tier lists several grades when they count
 together. Only sends (`send` or `flash`) fill a slot; attempts never do. Sends drop

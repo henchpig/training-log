@@ -57,6 +57,5 @@ export const S = {
   log: { addCat: 'sc', search: '' },
   history: { items: [], catFilter: '', view: 'list', detailId: null },
   library: { catFilter: '', search: '', editingId: null },
-  progress: { category: 'sc', exerciseId: null, protocol: null, grip: null,
-              redpointView: 'chart', pyramidPick: null }
+  progress: { category: 'sc', exerciseId: null, protocol: null, grip: null }
 };

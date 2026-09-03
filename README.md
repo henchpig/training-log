@@ -17,7 +17,7 @@ js/
   log.js              Log tab — session builder, all five entry shapes
   history.js          History tab — session list, detail, edit, delete
   progress.js         Progress tab — charts
-  pyramid.js          redpoint pyramid
+  pyramid.js          Pyramid tab — redpoint pyramid
   library.js          Library tab — S&C + cardio exercise CRUD
   format.js           shared entry → display-text formatting
   utils.js
@@ -110,9 +110,10 @@ config. Screenshots land in `test/screenshots/`.
 - **Built for a phone.** Tab bar sits at the bottom within thumb reach, the Save
   button sticks above it, inputs are 16px so iOS doesn't zoom when you focus one,
   and set columns are labelled — placeholders disappear once a box has a number in it.
-- **Redpoint pyramid** lives under Progress → Rope Redpoint → Pyramid. Tiers come from
-  `REDPOINT_PYRAMID` in `state.js`; edit that array to change the shape. Only sends
-  fill blocks, and tapping a filled one shows its date, grade, name and attempts.
+- **Redpoint pyramid** has its own tab. Tiers come from `REDPOINT_PYRAMID` in
+  `state.js`; edit that array to change the shape. Only sends fill blocks, a send counts
+  toward its own tier only, and blocks fill oldest-first. Tap a filled block (or hover on
+  desktop) for its date, grade, name and attempts.
 - **Climbs aren't library items either.** Name is optional free text (autocompleting from
   your own history) — it's shorthand for your memory, not a tracked entity. Grade,
   outcome and attempts are what get charted.
