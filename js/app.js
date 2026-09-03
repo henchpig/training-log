@@ -26,16 +26,19 @@ document.querySelectorAll('#tab-nav button').forEach(btn => {
   btn.onclick = () => switchTab(btn.dataset.tab, btn);
 });
 
-async function loadRecentClimbNames() {
+async function loadAutocompleteValues() {
   try {
-    const [b, r] = await Promise.all([
+    const [b, r, f] = await Promise.all([
       fetchEntriesByCategory('boulder'),
-      fetchEntriesByCategory('rope_redpoint')
+      fetchEntriesByCategory('rope_redpoint'),
+      fetchEntriesByCategory('finger')
     ]);
-    S.recentClimbNames = [...b, ...r]
-      .sort((x, y) => (y.date || '').localeCompare(x.date || ''))
+    const newestFirst = (x, y) => (y.date || '').localeCompare(x.date || '');
+    S.recentClimbNames = [...b, ...r].sort(newestFirst)
       .map(e => e.name).filter(Boolean).slice(0, 50);
-  } catch { S.recentClimbNames = []; }
+    S.recentImplements = f.sort(newestFirst)
+      .flatMap(e => (e.sets || []).map(s => s.implement)).filter(Boolean).slice(0, 50);
+  } catch { S.recentClimbNames = []; S.recentImplements = []; }
 }
 
 initAuth({
@@ -50,7 +53,7 @@ initAuth({
     }
     if (!loadDraft()) newSession();
     switchTab('log');
-    loadRecentClimbNames();
+    loadAutocompleteValues();
   },
   onSignedOut: () => {
     S.user = null;

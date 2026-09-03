@@ -95,6 +95,12 @@ round-trips, and every progress chart's config. Screenshots land in `test/screen
 - **Finger training has no library entries.** The protocol (Max Hang / Density Hang /
   Repeaters / Pulses) plus per-set grip and apparatus fully describe the work,
   so you pick the protocol directly when logging. Each protocol gets its own progress chart.
+- **Rehab is its own category**, with load / reps / duration / RPE per set (fill what
+  applies). It's separate from S&C so a 30 lb wrist extension never shares a chart axis
+  with a 200 lb lift.
+- **Finger sets carry an implement** — free text for the edge or block you pulled on,
+  independent of grip. Half crimp on an unlevel edge and half crimp on a crimp block are
+  the same grip, different implements. It shows up when you hover a progress chart point.
 - **Climbs aren't library items either.** Name is optional free text (autocompleting from
   your own history) — it's shorthand for your memory, not a tracked entity. Grade,
   outcome and attempts are what get charted.

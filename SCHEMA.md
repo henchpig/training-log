@@ -10,7 +10,7 @@ Bouldering / rope never reference this collection.
 ```
 {
   name: string,
-  category: 'sc' | 'cardio' | 'finger',
+  category: 'sc' | 'cardio' | 'rehab',
   stimulus: 'strength' | 'power' | 'power_endurance' | 'endurance' | 'capacity',
   movement: ['push'|'pull'|'hinge'|'squat'|'hold', ...],   // sc only, optional
   targets: ['legs'|'arms'|'chest'|'back'|'hips'|'core', ...], // sc only, optional
@@ -61,13 +61,23 @@ exerciseId, exerciseName,
 protocol: 'max_hang' | 'density_hang' | 'repeaters' | 'pulses',
 sets: [ ... shape depends on protocol, see below ]
 ```
+Every finger set carries `grip`, `apparatus` ('hb_bimanual'|'hb_unilateral'|'no_hang')
+and `implement` (free text — the edge/block you pulled on, e.g. "unlevel edge";
+autocompletes from history, not a tracked entity). Then, by protocol:
 - `max_hang` / `density_hang` (share a shape — same data, different training intent):
-  `{ grip, apparatus: 'hb_bimanual'|'hb_unilateral'|'no_hang', restSec,
-     reps: [{ load, durationSec, rpe }] }`
+  `{ ...grip/apparatus/implement, restSec, reps: [{ load, durationSec, rpe }] }`
 - `repeaters`:
-  `{ grip, apparatus, load, workSec, restSec, reps }`
+  `{ ...grip/apparatus/implement, load, workSec, restSec, reps }`
 - `pulses` (pick the weight up and set it straight back down, for reps):
-  `{ grip, apparatus, load, reps, rpe }`
+  `{ ...grip/apparatus/implement, load, reps, rpe }`
+
+**category: 'rehab'**
+Kept separate from both S&C and finger training so rehab loads never share an axis
+with training loads.
+```
+exerciseId, exerciseName,
+sets: [{ load, reps, durationSec, rpe }]   // all optional — fill what applies
+```
 
 **category: 'boulder' | 'rope_redpoint'**
 One entry = one climb (no exercise library involved).
@@ -88,5 +98,8 @@ sets: [{ grade, laps, timeSec }]
 - S&C / Cardio / Finger: `collectionGroup('entries').where('uid','==',uid).where('exerciseId','==',id)`,
   sorted client-side by `date`. Finger additionally filters by `protocol` (and optionally `grip`)
   since Max Hang / Density Hang / Repeaters / Pulses are separate charts.
+- Rehab: per exercise, metrics load / duration / reps.
+- The per-session charts plot the best set of each day; hovering a point shows that
+  set's details (grip, implement, apparatus, load, duration, RPE).
 - Boulder / Rope Redpoint / Rope Endurance: `collectionGroup('entries').where('uid','==',uid).where('category','==','boulder'|'rope_redpoint'|'rope_endurance')`,
   sorted client-side by `date`. Rope Endurance additionally flattens `sets` (one point per set).

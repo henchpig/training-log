@@ -85,10 +85,10 @@ function renderExRow(ex) {
             <div class="chip-list edit-targets" style="margin-top:4px">
               ${TARGETS.map(t => `<span class="mp-chip${(ex.targets || []).includes(t) ? ' selected' : ''}" data-val="${t}">${t}</span>`).join('')}
             </div>
-          </div>` : `
+          </div>` : ex.category === 'cardio' ? `
           <div class="field"><label>Cardio type</label>
             <select class="edit-cardiotype">${CARDIO_TYPES.map(t => `<option value="${t}"${ex.cardioType === t ? ' selected' : ''}>${t}</option>`).join('')}</select>
-          </div>`}
+          </div>` : ''}
         <div class="btn-group" style="margin-top:10px">
           <button class="btn btn-sm btn-primary" data-lib-save="${ex.id}">Save</button>
           <button class="btn btn-sm" data-lib-cancel="1">Cancel</button>
@@ -122,9 +122,9 @@ function wireLibrary() {
 
   const catSel = document.getElementById('new-ex-cat');
   const syncCatFields = () => {
-    const isCardio = catSel.value === 'cardio';
-    document.getElementById('new-ex-sc-fields').style.display = isCardio ? 'none' : 'block';
-    document.getElementById('new-ex-cardio-fields').style.display = isCardio ? 'block' : 'none';
+    const cat = catSel.value;
+    document.getElementById('new-ex-sc-fields').style.display = cat === 'sc' ? 'block' : 'none';
+    document.getElementById('new-ex-cardio-fields').style.display = cat === 'cardio' ? 'block' : 'none';
   };
   catSel.onchange = syncCatFields;
   syncCatFields();
@@ -139,7 +139,7 @@ function wireLibrary() {
     const data = { name, category, stimulus: document.getElementById('new-ex-stim').value };
     if (category === 'cardio') {
       data.cardioType = document.getElementById('new-ex-cardiotype').value;
-    } else {
+    } else if (category === 'sc') {
       data.movement = chipValues(document.getElementById('new-ex-movement'));
       data.targets = chipValues(document.getElementById('new-ex-targets'));
     }
@@ -186,7 +186,7 @@ function wireLibrary() {
       const data = { name, stimulus: row.querySelector('.edit-stim').value };
       if (ex.category === 'cardio') {
         data.cardioType = row.querySelector('.edit-cardiotype').value;
-      } else {
+      } else if (ex.category === 'sc') {
         data.movement = chipValues(row.querySelector('.edit-movement'));
         data.targets = chipValues(row.querySelector('.edit-targets'));
       }

@@ -39,15 +39,24 @@ export function clearDraft() {
 const scSet = () => ({ weight: '', weightType: 'absolute', reps: '', rpe: '' });
 const intervalSet = () => ({ workSec: '', restSec: '', reps: '', distance: '' });
 const hangRep = () => ({ load: '', durationSec: '', rpe: '' });
-const hangSet = () => ({ grip: GRIPS[0], apparatus: 'hb_bimanual', restSec: '', reps: [hangRep()] });
-const repeaterSet = () => ({ grip: GRIPS[0], apparatus: 'hb_bimanual', load: '', workSec: '7', restSec: '3', reps: '' });
-const pulseSet = () => ({ grip: GRIPS[0], apparatus: 'no_hang', load: '', reps: '', rpe: '' });
+const hangSet = () => ({ grip: GRIPS[0], apparatus: 'hb_bimanual', implement: '', restSec: '', reps: [hangRep()] });
+const repeaterSet = () => ({ grip: GRIPS[0], apparatus: 'hb_bimanual', implement: '', load: '', workSec: '7', restSec: '3', reps: '' });
+const pulseSet = () => ({ grip: GRIPS[0], apparatus: 'no_hang', implement: '', load: '', reps: '', rpe: '' });
+const rehabSet = () => ({ load: '', reps: '', durationSec: '', rpe: '' });
 const lapSet = () => ({ grade: '', laps: '', timeSec: '' });
 
 function fingerSetFor(protocol) {
   if (protocol === 'repeaters') return repeaterSet();
   if (protocol === 'pulses') return pulseSet();
   return hangSet();
+}
+
+function setFactoryFor(e) {
+  if (e.category === 'sc') return scSet;
+  if (e.category === 'cardio') return intervalSet;
+  if (e.category === 'rehab') return rehabSet;
+  if (e.category === 'rope_endurance') return lapSet;
+  return () => fingerSetFor(e.protocol);
 }
 
 function addEntry(entry) {
@@ -85,17 +94,23 @@ function normalizeEntry(e) {
     }
     case 'finger':
       return { ...base, protocol: e.protocol, sets: e.sets.map(s => {
+        const setBase = { grip: s.grip, apparatus: s.apparatus, implement: s.implement || null };
         if (e.protocol === 'repeaters') {
-          return { grip: s.grip, apparatus: s.apparatus, load: num(s.load),
+          return { ...setBase, load: num(s.load),
             workSec: parseDuration(s.workSec), restSec: parseDuration(s.restSec), reps: num(s.reps) };
         }
         if (e.protocol === 'pulses') {
-          return { grip: s.grip, apparatus: s.apparatus, load: num(s.load),
-            reps: num(s.reps), rpe: num(s.rpe) };
+          return { ...setBase, load: num(s.load), reps: num(s.reps), rpe: num(s.rpe) };
         }
-        return { grip: s.grip, apparatus: s.apparatus, restSec: parseDuration(s.restSec),
+        return { ...setBase, restSec: parseDuration(s.restSec),
           reps: s.reps.map(r => ({ load: num(r.load), durationSec: parseDuration(r.durationSec), rpe: num(r.rpe) })) };
       }) };
+    case 'rehab':
+      return { ...base, exerciseId: e.exerciseId, exerciseName: e.exerciseName,
+        sets: e.sets.map(s => ({
+          load: num(s.load), reps: num(s.reps),
+          durationSec: parseDuration(s.durationSec), rpe: num(s.rpe)
+        })) };
     case 'boulder':
     case 'rope_redpoint':
       return { ...base, name: e.name || null, grade: e.grade,
@@ -186,6 +201,7 @@ function entryBody(e, i) {
   switch (e.category) {
     case 'sc': return scBody(e, i);
     case 'cardio': return cardioBody(e, i);
+    case 'rehab': return rehabBody(e, i);
     case 'finger': return fingerBody(e, i);
     case 'boulder':
     case 'rope_redpoint': return climbBody(e, i);
@@ -254,7 +270,23 @@ function gripApparatusFields(s, i, si) {
     </select>
     <select data-e="${i}" data-s="${si}" data-f="apparatus" style="flex:1 1 130px">
       ${Object.entries(APPARATUS).map(([v, l]) => `<option value="${v}"${s.apparatus === v ? ' selected' : ''}>${l}</option>`).join('')}
-    </select>`;
+    </select>
+    <input type="text" list="implements" placeholder="implement" value="${esc(s.implement)}" data-e="${i}" data-s="${si}" data-f="implement" style="flex:1 1 120px">`;
+}
+
+function rehabBody(e, i) {
+  return `
+    <div class="section-label" style="margin-bottom:4px">Sets — fill what applies</div>
+    ${e.sets.map((s, si) => `
+      <div class="set-row">
+        <span class="set-num">${si + 1}</span>
+        <input type="number" step="0.5" placeholder="load" value="${esc(s.load)}" data-e="${i}" data-s="${si}" data-f="load">
+        <input type="number" placeholder="reps" value="${esc(s.reps)}" data-e="${i}" data-s="${si}" data-f="reps">
+        <input type="text" placeholder="secs" value="${esc(s.durationSec)}" data-e="${i}" data-s="${si}" data-f="durationSec">
+        <input type="number" step="0.5" placeholder="RPE" value="${esc(s.rpe)}" data-e="${i}" data-s="${si}" data-f="rpe">
+        <button class="btn-danger" data-act="del-set" data-e="${i}" data-s="${si}">✕</button>
+      </div>`).join('')}
+    <button class="btn btn-sm" style="margin-top:6px" data-act="add-set" data-e="${i}">+ Set</button>`;
 }
 
 function fingerBody(e, i) {
@@ -390,6 +422,9 @@ function renderAddPanel() {
     </div>
     <datalist id="climb-names">
       ${[...new Set(S.recentClimbNames || [])].map(n => `<option value="${esc(n)}">`).join('')}
+    </datalist>
+    <datalist id="implements">
+      ${[...new Set(S.recentImplements || [])].map(n => `<option value="${esc(n)}">`).join('')}
     </datalist>`;
 }
 
@@ -435,6 +470,11 @@ function wireLog() {
         case 'add-lib': {
           const ex = S.exercises.find(x => x.id === ds.ex);
           if (!ex) return;
+          if (ex.category === 'rehab') {
+            addEntry({ category: 'rehab', exerciseId: ex.id, exerciseName: ex.name,
+              sets: [rehabSet(), rehabSet(), rehabSet()] });
+            return;
+          }
           if (ex.category === 'cardio') {
             addEntry({ category: 'cardio', exerciseId: ex.id, exerciseName: ex.name,
               cardioClass: 'endurance',
@@ -457,17 +497,11 @@ function wireLog() {
           return;
         case 'del-entry': S.session.entries.splice(+ds.e, 1); break;
         case 'add-set':
-          e.sets.push(e.category === 'sc' ? scSet()
-            : e.category === 'cardio' ? intervalSet()
-            : e.category === 'rope_endurance' ? lapSet()
-            : fingerSetFor(e.protocol));
+          e.sets.push(setFactoryFor(e)());
           break;
         case 'del-set':
           e.sets.splice(+ds.s, 1);
-          if (!e.sets.length) e.sets.push(e.category === 'sc' ? scSet()
-            : e.category === 'cardio' ? intervalSet()
-            : e.category === 'rope_endurance' ? lapSet()
-            : fingerSetFor(e.protocol));
+          if (!e.sets.length) e.sets.push(setFactoryFor(e)());
           break;
         case 'add-rep': e.sets[+ds.s].reps.push(hangRep()); break;
         case 'del-rep':
