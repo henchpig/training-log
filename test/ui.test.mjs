@@ -158,6 +158,7 @@ await step('add rope endurance laps', async () => {
   await card.locator('select[data-f=grade]').first().selectOption('5.11a');
   await card.locator('input[data-f=laps]').first().fill('4');
   await card.locator('input[data-f=timeSec]').first().fill('3:30');
+  await card.locator('input[data-f=rpe]').first().fill('7');
 });
 await step('create a Rehab exercise and log timed-hold sets', async () => {
   await page.click('#tab-nav button[data-tab=library]');
@@ -222,6 +223,8 @@ await step('normalized data shapes are correct', async () => {
   }
   const laps = e.find(x => x.category === 'rope_endurance');
   if (laps.sets[0].timeSec !== 210) throw new Error('mm:ss not parsed, got ' + laps.sets[0].timeSec);
+  if (laps.sets[0].grade !== '5.11a') throw new Error('grade should store canonical, got ' + laps.sets[0].grade);
+  if (laps.sets[0].rpe !== 7) throw new Error('lap rpe not stored, got ' + laps.sets[0].rpe);
 });
 
 console.log('\n--- HISTORY TAB ---');
@@ -260,6 +263,14 @@ await step('S&C chart renders for Bench Press', async () => {
   // sets: BW-20, 145, 155 → heaviest load 155
   if (!stats.includes('155')) throw new Error('expected best load 155, got: ' + stats.replace(/\n/g, ' '));
 });
+await step('Est 1RM uses Epley (155 x 5 -> 181)', async () => {
+  await page.locator('#tab-progress .pill', { hasText: 'Est 1RM' }).click();
+  await page.waitForTimeout(400);
+  const data = await page.evaluate(() => window.__CHARTS[window.__CHARTS.length - 1].data.datasets[0].data);
+  if (data[0] !== 181) throw new Error('expected 181, got ' + data.join(','));
+  await page.locator('#tab-progress .pill', { hasText: 'Load' }).first().click();
+  await page.waitForTimeout(300);
+});
 await step('relative (BW±) weight type round-trips', async () => {
   const sc = await page.evaluate(() => window.__DB.entries.find(e => e.category === 'sc'));
   if (sc.sets[0].weightType !== 'relative' || sc.sets[0].weight !== -20) {
@@ -278,8 +289,8 @@ await step('history shows BW-20 for the relative set', async () => {
   await page.locator('#tab-progress .chip', { hasText: 'Bench Press' }).click();
   await page.waitForTimeout(400);
 });
-await step('S&C metric toggles work', async () => {
-  for (const m of ['Reps', 'Total Work']) {
+await step('S&C metric toggles work, incl. Est 1RM', async () => {
+  for (const m of ['Reps', 'Total Work', 'Est 1RM']) {
     await page.locator('#tab-progress .pill', { hasText: m }).first().click();
     await page.waitForTimeout(300);
   }
@@ -328,7 +339,7 @@ await step('laps chart config: one point per set w/ laps+time in point', async (
   await page.waitForTimeout(500);
   const cfg = await page.evaluate(() => window.__CHARTS[window.__CHARTS.length - 1]);
   const pt = cfg.data.datasets[0].data[0];
-  if (pt.grade !== '5.11a' || pt.laps !== 4 || pt.timeSec !== 210) {
+  if (pt.grade !== '5.11a' || pt.laps !== 4 || pt.timeSec !== 210 || pt.rpe !== 7) {
     throw new Error('lap point wrong: ' + JSON.stringify(pt));
   }
 });

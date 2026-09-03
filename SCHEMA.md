@@ -91,14 +91,23 @@ notes: string
 
 **category: 'rope_endurance'**
 ```
-sets: [{ grade, laps, timeSec }]
+sets: [{ grade, laps, timeSec, rpe }]
 ```
+
+## Grades
+Boulder uses the V scale. Rope is stored and displayed as full YDS (`5.9`, `5.12a`).
+Only the grade *picker* shortens the labels — you choose `9` or `12a`, and it reads
+back everywhere as `5.9` / `5.12a`. See `gradeLabel` in `state.js`; it's a display
+concern only, so nothing downstream has to translate.
 
 ## Progress queries
 - S&C / Cardio / Finger: `collectionGroup('entries').where('uid','==',uid).where('exerciseId','==',id)`,
   sorted client-side by `date`. Finger additionally filters by `protocol` (and optionally `grip`)
   since Max Hang / Density Hang / Repeaters / Pulses are separate charts.
 - Rehab: per exercise, metrics load / duration / reps.
+- S&C metrics are load / reps / total work / est 1RM. Est 1RM is derived per set with
+  Epley (`load × (1 + reps/30)`), never stored — a stored copy only drifts from the
+  load and reps it came from.
 - The per-session charts plot the best set of each day; hovering a point shows that
   set's details (grip, implement, apparatus, load, duration, RPE).
 - Boulder / Rope Redpoint / Rope Endurance: `collectionGroup('entries').where('uid','==',uid).where('category','==','boulder'|'rope_redpoint'|'rope_endurance')`,

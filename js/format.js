@@ -56,7 +56,7 @@ export function entryLines(e) {
         .concat(e.notes ? [e.notes] : []);
     case 'rope_endurance':
       return (e.sets || []).map((s, i) =>
-        `${i + 1}.  ${s.grade || '–'} × ${s.laps ?? '–'} laps${s.timeSec ? ` · ${fmtSecAsMMSS(s.timeSec)} on the wall` : ''}`);
+        `${i + 1}.  ${s.grade || '–'} × ${s.laps ?? '–'} laps${s.timeSec ? ` · ${fmtSecAsMMSS(s.timeSec)} on the wall` : ''}${s.rpe ? ` @ RPE ${s.rpe}` : ''}`);
     default:
       return [];
   }
