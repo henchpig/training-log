@@ -92,7 +92,8 @@ config. Screenshots land in `test/screenshots/`.
 - **Recall panel.** Adding an S&C, cardio, rehab or finger entry shows the last three
   sessions of that exercise — load × reps @ RPE — above the empty sets you're about to
   fill. Nothing is pre-filled: what you lift today depends on the warm-up, so the panel
-  informs the choice rather than making it.
+  informs the choice rather than making it. Logging only — editing an old session hides
+  it, since the numbers are already known.
 - **Draft autosave** — the in-progress session is saved to `localStorage` on every
   keystroke, so a refresh or closing the tab won't lose it. It clears on save.
 - **Weights are absolute or relative.** An S&C set is either `lb` (absolute) or `BW±`,

@@ -16,7 +16,7 @@ const recallKey = e => e.category === 'finger' ? `proto:${e.protocol}`
 
 async function loadRecall(entry) {
   const key = recallKey(entry);
-  if (!key) return;
+  if (!key || isEditing()) return;
   if (!recallCache.has(key)) {
     try {
       const rows = entry.category === 'finger'
@@ -41,9 +41,16 @@ function recentSessions(entry) {
   return [...byDate.values()].slice(0, RECALL_SESSIONS);
 }
 
+// Only while logging. Editing an existing session is bookkeeping — the numbers
+// are already known, and prior sessions aren't what you're deciding against.
+// A session carrying an id is one that already exists, which also covers
+// reloading mid-edit, when editingSessionId is gone but the id survives.
+const isEditing = () => Boolean(S.editingSessionId || S.session?.id);
+
 function paintRecall(entry) {
   const host = document.querySelector(`[data-recall="${entry._localId}"]`);
   if (!host) return;
+  if (isEditing()) { host.innerHTML = ''; return; }
   const recent = recentSessions(entry);
   if (!recent || !recent.length) { host.innerHTML = ''; return; }
   host.innerHTML = `
@@ -65,6 +72,7 @@ export function newSession() {
 }
 
 export function primeRecall() {
+  if (isEditing()) return;
   (S.session?.entries || []).forEach(e => { if (recallKey(e)) loadRecall(e); });
 }
 

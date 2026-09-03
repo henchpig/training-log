@@ -110,7 +110,8 @@ Adding an entry fetches that exercise's past entries (by `exerciseId`, or by `pr
 for finger training), keeps the newest three *distinct dates* strictly before the session
 being logged, and renders them as `load × reps @ RPE`. It reuses the existing progress
 queries, so no extra index. Cached per exercise for the life of the page and cleared on
-save, since a saved session becomes history.
+save, since a saved session becomes history. Shown only while logging a new session —
+a session carrying an `id` is an existing one being edited, and gets no panel.
 
 ## Progress queries
 - S&C / Cardio / Finger: `collectionGroup('entries').where('uid','==',uid).where('exerciseId','==',id)`,

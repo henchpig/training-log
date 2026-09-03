@@ -2,7 +2,7 @@ import { S, CATEGORIES } from './state.js';
 import { esc, toast, fmtDate, uid } from './utils.js';
 import { fetchSessions, fetchSessionEntries, deleteSession } from './db.js';
 import { renderEntryReadonly, sessionSummary, sessionCategories } from './format.js';
-import { renderLog, clearDraft, primeRecall } from './log.js';
+import { renderLog, clearDraft } from './log.js';
 
 export async function loadHistory() {
   const el = document.getElementById('tab-history');
@@ -97,6 +97,5 @@ function renderDetail(el) {
     S.history.view = 'list';
     document.querySelector('#tab-nav button[data-tab="log"]').click();
     renderLog();
-    primeRecall();
   };
 }
