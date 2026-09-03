@@ -62,6 +62,42 @@ export function entryLines(e) {
   }
 }
 
+// One compact line per past session — "330×6 @8 · 315×6 @7 · 295×6 @6" — for the
+// recall panel. Deliberately denser than entryLines, which gives a set per line.
+export function compactSets(e) {
+  switch (e.category) {
+    case 'sc':
+      return (e.sets || []).map(s =>
+        `${wt(s)}×${s.reps ?? '–'}${s.rpe ? ` @${s.rpe}` : ''}`).join(' · ');
+    case 'rehab':
+      return (e.sets || []).map(s => [
+        s.load != null ? `${s.load}lb` : null,
+        s.reps != null ? `×${s.reps}` : null,
+        s.durationSec != null ? `${s.durationSec}s` : null
+      ].filter(Boolean).join(' ') + (s.rpe ? ` @${s.rpe}` : '')).join(' · ');
+    case 'finger':
+      return (e.sets || []).map(s => {
+        const head = s.grip;
+        if (e.protocol === 'repeaters') {
+          return `${head} ${s.load ?? 0}lb ${s.workSec ?? '–'}:${s.restSec ?? '–'}×${s.reps ?? '–'}`;
+        }
+        if (e.protocol === 'pulses') {
+          return `${head} ${s.load ?? 0}lb×${s.reps ?? '–'}${s.rpe ? ` @${s.rpe}` : ''}`;
+        }
+        return (s.reps || []).map(r =>
+          `${head} ${r.load ?? 0}lb×${r.durationSec ?? '–'}s${r.rpe ? ` @${r.rpe}` : ''}`).join(' · ');
+      }).join(' · ');
+    case 'cardio':
+      if (e.cardioClass === 'endurance' && e.endurance) {
+        return `${e.endurance.distance ?? '–'}${e.endurance.distanceUnit || ''} in ${fmtSecAsMMSS(e.endurance.timeSec)}`;
+      }
+      return (e.sets || []).map(s =>
+        `${s.workSec ?? '–'}:${s.restSec ?? '–'}×${s.reps ?? '–'}`).join(' · ');
+    default:
+      return '';
+  }
+}
+
 export function sessionSummary(entries) {
   return entries.map(entryTitle).join(', ');
 }

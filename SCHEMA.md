@@ -105,6 +105,14 @@ together. Only sends (`send` or `flash`) fill a slot; attempts never do. Sends d
 into their tier oldest-first, and a tier holding more sends than slots shows the
 surplus as `+n` rather than growing.
 
+## Recall
+Adding an entry fetches that exercise's past entries (by `exerciseId`, or by `protocol`
+for finger training), keeps the newest three *distinct dates* strictly before the session
+being logged, and renders them as `load × reps @ RPE`. It reuses the existing progress
+queries, so no extra index. Cached per exercise for the life of the page and cleared on
+save, since a saved session becomes history. Shown only while logging a new session —
+a session carrying an `id` is an existing one being edited, and gets no panel.
+
 ## Progress queries
 - S&C / Cardio / Finger: `collectionGroup('entries').where('uid','==',uid).where('exerciseId','==',id)`,
   sorted client-side by `date`. Finger additionally filters by `protocol` (and optionally `grip`)

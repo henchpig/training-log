@@ -2,7 +2,7 @@ import { S } from './state.js';
 import { initAuth } from './auth.js';
 import { fetchExercises, fetchEntriesByCategory } from './db.js';
 import { renderLibrary } from './library.js';
-import { renderLog, newSession, loadDraft } from './log.js';
+import { renderLog, newSession, loadDraft, primeRecall } from './log.js';
 import { loadHistory } from './history.js';
 import { renderProgress, invalidateProgressCache } from './progress.js';
 import { renderPyramidTab } from './pyramid.js';
@@ -55,6 +55,7 @@ initAuth({
     }
     if (!loadDraft()) newSession();
     switchTab('log');
+    primeRecall();
     loadAutocompleteValues();
   },
   onSignedOut: () => {
