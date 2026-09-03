@@ -11,7 +11,7 @@ let chart = null;
 let cache = { key: null, entries: [] };
 
 const METRICS = {
-  sc: { load: 'Load', reps: 'Reps', work: 'Total Work' },
+  sc: { load: 'Load', reps: 'Reps', work: 'Total Work', e1rm: 'Est 1RM' },
   cardio: { distance: 'Distance', time: 'Time', pace: 'Pace' },
   rehab: { load: 'Load', duration: 'Duration', reps: 'Reps' },
   max_hang: { load: 'Load', duration: 'Duration' },
@@ -229,23 +229,32 @@ function statGrid(stats) {
 }
 
 // ── Strength & Conditioning ──────────────────────────────────
+// Epley: the estimate that makes a heavy triple and a lighter set of eight
+// comparable. Rounded, matching how it's normally written down.
+const epley = (weight, reps) =>
+  weight == null || reps == null ? null : Math.round(weight * (1 + reps / 30));
+
 function drawSCChart(entries) {
   const metric = S.progress.metric || 'load';
   const byDate = new Map();
   entries.forEach(e => {
     const sets = (e.sets || []).filter(s => s.reps != null || s.weight != null);
     if (!sets.length) return;
-    const cur = byDate.get(e.date) || { maxLoad: 0, reps: 0, work: 0 };
+    const cur = byDate.get(e.date) || { maxLoad: 0, reps: 0, work: 0, e1rm: 0 };
     sets.forEach(s => {
       const w = s.weight || 0, r = s.reps || 0;
       cur.maxLoad = Math.max(cur.maxLoad, w);
       cur.reps += r;
       cur.work += w * r;
+      cur.e1rm = Math.max(cur.e1rm, epley(w, r) || 0);
     });
     byDate.set(e.date, cur);
   });
   const dates = [...byDate.keys()].sort();
-  const pick = d => ({ load: byDate.get(d).maxLoad, reps: byDate.get(d).reps, work: byDate.get(d).work }[metric]);
+  const pick = d => {
+    const v = byDate.get(d);
+    return { load: v.maxLoad, reps: v.reps, work: v.work, e1rm: v.e1rm }[metric];
+  };
   const data = dates.map(pick);
 
   const ctx = resetCanvas();
@@ -265,7 +274,8 @@ function drawSCChart(entries) {
     ['Latest', last?.toLocaleString() ?? '–']
   ]);
   document.getElementById('prog-legend').innerHTML =
-    'Load = heaviest set that day · Reps = total reps · Total Work = Σ(load × reps). '
+    'Load = heaviest set · Reps = total reps · Total Work = Σ(load × reps) · '
+    + 'Est 1RM = best set by Epley, load × (1 + reps/30). '
     + 'For BW± sets the load is the weight added (negative = assisted).';
 }
 

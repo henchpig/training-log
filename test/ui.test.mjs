@@ -263,6 +263,14 @@ await step('S&C chart renders for Bench Press', async () => {
   // sets: BW-20, 145, 155 → heaviest load 155
   if (!stats.includes('155')) throw new Error('expected best load 155, got: ' + stats.replace(/\n/g, ' '));
 });
+await step('Est 1RM uses Epley (155 x 5 -> 181)', async () => {
+  await page.locator('#tab-progress .pill', { hasText: 'Est 1RM' }).click();
+  await page.waitForTimeout(400);
+  const data = await page.evaluate(() => window.__CHARTS[window.__CHARTS.length - 1].data.datasets[0].data);
+  if (data[0] !== 181) throw new Error('expected 181, got ' + data.join(','));
+  await page.locator('#tab-progress .pill', { hasText: 'Load' }).first().click();
+  await page.waitForTimeout(300);
+});
 await step('relative (BW±) weight type round-trips', async () => {
   const sc = await page.evaluate(() => window.__DB.entries.find(e => e.category === 'sc'));
   if (sc.sets[0].weightType !== 'relative' || sc.sets[0].weight !== -20) {
@@ -281,8 +289,8 @@ await step('history shows BW-20 for the relative set', async () => {
   await page.locator('#tab-progress .chip', { hasText: 'Bench Press' }).click();
   await page.waitForTimeout(400);
 });
-await step('S&C metric toggles work', async () => {
-  for (const m of ['Reps', 'Total Work']) {
+await step('S&C metric toggles work, incl. Est 1RM', async () => {
+  for (const m of ['Reps', 'Total Work', 'Est 1RM']) {
     await page.locator('#tab-progress .pill', { hasText: m }).first().click();
     await page.waitForTimeout(300);
   }
