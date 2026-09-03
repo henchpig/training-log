@@ -153,12 +153,36 @@ function safeChart(ctx, config) {
   }
 }
 
+// Firestore rejects a collection-group query until its composite index exists,
+// and puts a one-click creation link in the message. Surface that instead of
+// failing silently with an unhandled rejection.
+function showQueryError(err) {
+  const link = /https:\/\/console\.firebase\.google\.com\/\S+/.exec(err.message || '')?.[0];
+  const wrap = document.querySelector('#tab-progress .chart-wrap');
+  document.getElementById('prog-stats').innerHTML = '';
+  document.getElementById('prog-legend').innerHTML = '';
+  wrap.innerHTML = link
+    ? `<div class="empty" style="padding:24px">
+         <div class="empty-icon">🔑</div>
+         <div style="margin-bottom:10px">This chart needs a Firestore index.</div>
+         <a href="${esc(link)}" target="_blank" rel="noopener"
+            style="color:var(--green);font-size:13px">Create it (opens Firebase) →</a>
+         <div style="font-size:11px;margin-top:8px">Takes about a minute to build, then reload.</div>
+       </div>`
+    : `<div class="empty"><div class="empty-icon">⚠️</div>${esc(err.message || 'Could not load data')}</div>`;
+}
+
 async function drawChart() {
   const p = S.progress;
   if (LIBRARY_CATEGORIES.includes(p.category) && !p.exerciseId) {
     return setEmpty('Pick an exercise');
   }
-  const entries = await loadEntries();
+  let entries;
+  try {
+    entries = await loadEntries();
+  } catch (err) {
+    return showQueryError(err);
+  }
   if (!entries.length) return setEmpty('No data yet');
 
   if (p.category === 'boulder' || p.category === 'rope_redpoint') return drawClimbChart(entries);
