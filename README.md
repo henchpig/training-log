@@ -101,9 +101,13 @@ round-trips, and every progress chart's config. Screenshots land in `test/screen
 - **Finger sets carry an implement** — free text for the edge or block you pulled on,
   independent of grip. Half crimp on an unlevel edge and half crimp on a crimp block are
   the same grip, different implements. It shows up when you hover a progress chart point.
-- **Rope grades: short to pick, full to read.** The picker lists `9`, `10a`, `12a` —
-  no `5.` to scroll past — but everything reads back as `5.9`, `5.10a`, `5.12a`, and
-  that full form is what's stored.
+- **Progress charts overlay their metrics** rather than tabbing between them — load,
+  reps and total work share one chart on separate axes. Tap a legend key to hide a line.
+  Finger training charts one grip at a time (grip is a tab) with load and duration
+  overlaid, since blending grips on one line hides the thing you're looking for.
+- **Built for a phone.** Tab bar sits at the bottom within thumb reach, the Save
+  button sticks above it, inputs are 16px so iOS doesn't zoom when you focus one,
+  and set columns are labelled — placeholders disappear once a box has a number in it.
 - **Climbs aren't library items either.** Name is optional free text (autocompleting from
   your own history) — it's shorthand for your memory, not a tracked entity. Grade,
   outcome and attempts are what get charted.
