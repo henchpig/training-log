@@ -2,14 +2,70 @@ import {
   S, CATEGORIES, LIBRARY_CATEGORIES, GRIPS, FINGER_PROTOCOLS, APPARATUS,
   OUTCOMES, gradeScale
 } from './state.js';
-import { esc, toast, todayStr, uid, parseDuration, debounce } from './utils.js';
-import { saveSession } from './db.js';
+import { esc, toast, todayStr, uid, parseDuration, debounce, fmtDateShort } from './utils.js';
+import { saveSession, fetchEntriesByExercise, fetchEntriesByCategory } from './db.js';
+import { compactSets } from './format.js';
+
+// What you lifted last time, for autoregulating today against it. Cached per
+// exercise for the life of the page — it can't change while you're logging.
+const RECALL_SESSIONS = 3;
+const recallCache = new Map();
+
+const recallKey = e => e.category === 'finger' ? `proto:${e.protocol}`
+  : e.exerciseId ? `ex:${e.exerciseId}` : null;
+
+async function loadRecall(entry) {
+  const key = recallKey(entry);
+  if (!key) return;
+  if (!recallCache.has(key)) {
+    try {
+      const rows = entry.category === 'finger'
+        ? (await fetchEntriesByCategory('finger')).filter(x => x.protocol === entry.protocol)
+        : await fetchEntriesByExercise(entry.exerciseId);
+      recallCache.set(key, rows);
+    } catch {
+      recallCache.set(key, []);
+    }
+  }
+  paintRecall(entry);
+}
+
+function recentSessions(entry) {
+  const rows = recallCache.get(recallKey(entry));
+  if (!rows) return null;                       // still loading
+  // Today's own entries aren't history, and neither is anything after it.
+  const byDate = new Map();
+  rows.filter(r => r.date && r.date < S.session.date)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .forEach(r => { if (!byDate.has(r.date)) byDate.set(r.date, r); });
+  return [...byDate.values()].slice(0, RECALL_SESSIONS);
+}
+
+function paintRecall(entry) {
+  const host = document.querySelector(`[data-recall="${entry._localId}"]`);
+  if (!host) return;
+  const recent = recentSessions(entry);
+  if (!recent || !recent.length) { host.innerHTML = ''; return; }
+  host.innerHTML = `
+    <div class="recall">
+      <div class="recall-head">Last ${recent.length === 1 ? 'session' : `${recent.length} sessions`}</div>
+      ${recent.map(r => `
+        <div class="recall-row">
+          <span class="recall-date">${esc(fmtDateShort(r.date))}</span>
+          <span class="recall-sets">${esc(compactSets(r))}</span>
+        </div>`).join('')}
+    </div>`;
+}
 
 const DRAFT_KEY = () => `tl_draft_${S.user.uid}`;
 
 // ── Draft lifecycle ──────────────────────────────────────────
 export function newSession() {
   S.session = { id: null, date: todayStr(), notes: '', entries: [] };
+}
+
+export function primeRecall() {
+  (S.session?.entries || []).forEach(e => { if (recallKey(e)) loadRecall(e); });
 }
 
 export function loadDraft() {
@@ -60,8 +116,12 @@ function setFactoryFor(e) {
 }
 
 function addEntry(entry) {
-  S.session.entries.push({ _localId: uid(), ...entry });
+  const withId = { _localId: uid(), ...entry };
+  S.session.entries.push(withId);
   renderLog();
+  // Painted in afterwards rather than awaited, so adding an exercise stays
+  // instant and a slow fetch never blocks the form.
+  loadRecall(withId);
 }
 
 // ── Save ─────────────────────────────────────────────────────
@@ -133,6 +193,7 @@ async function doSave() {
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   try {
     await saveSession({ ...sess, entries: sess.entries.map(normalizeEntry) });
+    recallCache.clear();
     clearDraft();
     newSession();
     S.editingSessionId = null;
@@ -176,6 +237,7 @@ export function renderLog() {
     </div>`;
 
   wireLog();
+  S.session.entries.forEach(e => { if (recallKey(e)) paintRecall(e); });
 }
 
 function renderEntry(e, i) {
@@ -193,7 +255,10 @@ function renderEntry(e, i) {
         </div>
         <button class="btn-danger" data-act="del-entry" data-e="${i}">✕</button>
       </div>
-      <div class="entry-body">${entryBody(e, i)}</div>
+      <div class="entry-body">
+        <div data-recall="${e._localId}"></div>
+        ${entryBody(e, i)}
+      </div>
     </div>`;
 }
 

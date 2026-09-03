@@ -89,6 +89,10 @@ config. Screenshots land in `test/screenshots/`.
 
 - **The exercise library starts empty.** Add your own S&C and cardio exercises from
   the Library tab — nothing is pre-seeded.
+- **Recall panel.** Adding an S&C, cardio, rehab or finger entry shows the last three
+  sessions of that exercise — load × reps @ RPE — above the empty sets you're about to
+  fill. Nothing is pre-filled: what you lift today depends on the warm-up, so the panel
+  informs the choice rather than making it.
 - **Draft autosave** — the in-progress session is saved to `localStorage` on every
   keystroke, so a refresh or closing the tab won't lose it. It clears on save.
 - **Weights are absolute or relative.** An S&C set is either `lb` (absolute) or `BW±`,

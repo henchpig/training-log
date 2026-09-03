@@ -27,6 +27,11 @@ export function fmtDate(dateStr) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+export function fmtDateShort(dateStr) {
+  return new Date(dateStr + 'T12:00:00')
+    .toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export function fmtSecAsMMSS(sec) {
   if (sec == null || isNaN(sec)) return '';
   sec = Math.round(sec);
