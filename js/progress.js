@@ -1,4 +1,4 @@
-import { S, CATEGORIES, LIBRARY_CATEGORIES, FINGER_PROTOCOLS, GRIPS, gradeScale } from './state.js';
+import { S, CATEGORIES, LIBRARY_CATEGORIES, FINGER_PROTOCOLS, APPARATUS, GRIPS, gradeScale } from './state.js';
 import { esc, fmtSecAsMMSS, fmtDate } from './utils.js';
 import { fetchEntriesByExercise, fetchEntriesByCategory } from './db.js';
 
@@ -13,6 +13,7 @@ let cache = { key: null, entries: [] };
 const METRICS = {
   sc: { load: 'Load', reps: 'Reps', work: 'Total Work' },
   cardio: { distance: 'Distance', time: 'Time', pace: 'Pace' },
+  rehab: { load: 'Load', duration: 'Duration', reps: 'Reps' },
   max_hang: { load: 'Load', duration: 'Duration' },
   density_hang: { load: 'Load', duration: 'Duration' },
   repeaters: { load: 'Load', reps: 'Reps' },
@@ -164,6 +165,7 @@ async function drawChart() {
   if (p.category === 'rope_endurance') return drawLapsChart(entries);
   if (p.category === 'finger') return drawFingerChart(entries);
   if (p.category === 'cardio') return drawCardioChart(entries);
+  if (p.category === 'rehab') return drawRehabChart(entries);
   return drawSCChart(entries);
 }
 
@@ -180,6 +182,19 @@ const baseOptions = (yTitle, extra = {}) => ({
     tooltip: extra.tooltip || {}
   }
 });
+
+// Points on the per-session charts are the best set of that day; `meta` carries
+// that set's details so hovering shows what actually produced the number.
+function detailTooltip(meta) {
+  return {
+    callbacks: {
+      afterBody: items => {
+        const d = meta[items[0].dataIndex];
+        return d ? d.lines : [];
+      }
+    }
+  };
+}
 
 function statGrid(stats) {
   document.getElementById('prog-stats').innerHTML = `
@@ -270,32 +285,45 @@ function drawFingerChart(entries) {
   const metric = p.metric || 'load';
   const rows = [];
 
+  const setLines = (s, extra) => [
+    `grip: ${s.grip}`,
+    s.implement ? `implement: ${s.implement}` : null,
+    `apparatus: ${APPARATUS[s.apparatus] || s.apparatus}`,
+    ...extra
+  ].filter(Boolean);
+
   entries.filter(e => e.protocol === p.protocol).forEach(e => {
     (e.sets || []).forEach(s => {
       if (p.grip && s.grip !== p.grip) return;
       if (p.protocol === 'max_hang' || p.protocol === 'density_hang') {
         (s.reps || []).forEach(r => rows.push({
-          date: e.date, load: r.load, duration: r.durationSec, grip: s.grip
+          date: e.date, load: r.load, duration: r.durationSec,
+          lines: setLines(s, [`${r.load ?? '–'}lb × ${r.durationSec ?? '–'}s`,
+            r.rpe ? `RPE ${r.rpe}` : null])
         }));
       } else if (p.protocol === 'repeaters') {
-        rows.push({ date: e.date, load: s.load, reps: s.reps, grip: s.grip });
+        rows.push({ date: e.date, load: s.load, reps: s.reps,
+          lines: setLines(s, [`${s.load ?? '–'}lb, ${s.workSec ?? '–'}:${s.restSec ?? '–'} × ${s.reps ?? '–'}`]) });
       } else {
-        rows.push({ date: e.date, load: s.load, reps: s.reps, work: (s.load || 0) * (s.reps || 0), grip: s.grip });
+        rows.push({ date: e.date, load: s.load, reps: s.reps, work: (s.load || 0) * (s.reps || 0),
+          lines: setLines(s, [`${s.load ?? '–'}lb × ${s.reps ?? '–'}`, s.rpe ? `RPE ${s.rpe}` : null]) });
       }
     });
   });
   if (!rows.length) return setEmpty('No data for this protocol/grip yet');
 
-  // Best value per session date.
+  // Best set per session date, keeping that set's details for the tooltip.
   const byDate = new Map();
   rows.forEach(r => {
     const v = r[metric];
     if (v == null) return;
-    byDate.set(r.date, Math.max(byDate.get(r.date) ?? -Infinity, v));
+    const cur = byDate.get(r.date);
+    if (!cur || v > cur.value) byDate.set(r.date, { value: v, lines: r.lines });
   });
   const dates = [...byDate.keys()].sort();
   if (!dates.length) return setEmpty('No data for this metric yet');
-  const data = dates.map(d => byDate.get(d));
+  const data = dates.map(d => byDate.get(d).value);
+  const meta = dates.map(d => byDate.get(d));
   const yTitle = METRICS[p.protocol][metric] + (metric === 'duration' ? ' (s)' : metric === 'load' ? ' (lb)' : '');
 
   const ctx = resetCanvas();
@@ -304,7 +332,7 @@ function drawFingerChart(entries) {
     data: { labels: dates.map(fmtDate), datasets: [{
       label: yTitle, data, borderColor: C.green, backgroundColor: C.green, tension: .25, pointRadius: 4
     }] },
-    options: baseOptions(yTitle, { legend: false })
+    options: baseOptions(yTitle, { legend: false, tooltip: detailTooltip(meta) })
   });
   statGrid([
     ['Sessions', dates.length],
@@ -312,7 +340,47 @@ function drawFingerChart(entries) {
     ['Latest', data[data.length - 1]]
   ]);
   document.getElementById('prog-legend').innerHTML =
-    `${FINGER_PROTOCOLS[p.protocol]}${p.grip ? ` · ${esc(p.grip)}` : ' · all grips'} — best value per session`;
+    `${FINGER_PROTOCOLS[p.protocol]}${p.grip ? ` · ${esc(p.grip)}` : ' · all grips'} — best set per session; hover for its details`;
+}
+
+// ── Rehab ────────────────────────────────────────────────────
+function drawRehabChart(entries) {
+  const metric = S.progress.metric || 'load';
+  const pick = s => ({ load: s.load, duration: s.durationSec, reps: s.reps }[metric]);
+
+  const byDate = new Map();
+  entries.forEach(e => (e.sets || []).forEach(s => {
+    const v = pick(s);
+    if (v == null) return;
+    const cur = byDate.get(e.date);
+    if (cur && v <= cur.value) return;
+    byDate.set(e.date, { value: v, lines: [
+      [s.load != null ? `${s.load}lb` : null, s.reps != null ? `× ${s.reps}` : null,
+       s.durationSec != null ? `${s.durationSec}s` : null].filter(Boolean).join(' '),
+      s.rpe ? `RPE ${s.rpe}` : null
+    ].filter(Boolean) });
+  }));
+
+  const dates = [...byDate.keys()].sort();
+  if (!dates.length) return setEmpty('No data for this metric yet');
+  const data = dates.map(d => byDate.get(d).value);
+  const meta = dates.map(d => byDate.get(d));
+  const yTitle = METRICS.rehab[metric] + (metric === 'duration' ? ' (s)' : metric === 'load' ? ' (lb)' : '');
+
+  const ctx = resetCanvas();
+  chart = safeChart(ctx, {
+    type: 'line',
+    data: { labels: dates.map(fmtDate), datasets: [{
+      label: yTitle, data, borderColor: C.purple, backgroundColor: C.purple, tension: .25, pointRadius: 4
+    }] },
+    options: baseOptions(yTitle, { legend: false, tooltip: detailTooltip(meta) })
+  });
+  statGrid([
+    ['Sessions', dates.length],
+    ['Best', Math.max(...data)],
+    ['Latest', data[data.length - 1]]
+  ]);
+  document.getElementById('prog-legend').innerHTML = 'Best set per session — hover for its details';
 }
 
 // ── Bouldering / Rope Redpoint ───────────────────────────────

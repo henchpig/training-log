@@ -31,7 +31,7 @@ export function entryLines(e) {
         `${i + 1}.  ${s.workSec ?? '–'}s on : ${s.restSec ?? '–'}s off × ${s.reps ?? '–'}${s.distance ? ` · ${s.distance}` : ''}`);
     case 'finger':
       return (e.sets || []).flatMap((s, i) => {
-        const head = `${i + 1}.  ${s.grip} · ${APPARATUS[s.apparatus] || s.apparatus}`;
+        const head = `${i + 1}.  ${[s.grip, s.implement, APPARATUS[s.apparatus] || s.apparatus].filter(Boolean).join(' · ')}`;
         if (e.protocol === 'repeaters') {
           return [`${head} — ${s.load ?? 0}lb, ${s.workSec ?? '–'}:${s.restSec ?? '–'} × ${s.reps ?? '–'}`];
         }
@@ -40,6 +40,15 @@ export function entryLines(e) {
         }
         return [head, ...(s.reps || []).map((r, ri) =>
           `    ·${ri + 1}  ${r.load ?? 0}lb × ${r.durationSec ?? '–'}s${r.rpe ? ` @ RPE ${r.rpe}` : ''}`)];
+      });
+    case 'rehab':
+      return (e.sets || []).map((s, i) => {
+        const bits = [
+          s.load != null ? `${s.load}lb` : null,
+          s.reps != null ? `× ${s.reps}` : null,
+          s.durationSec != null ? `${s.durationSec}s` : null
+        ].filter(Boolean).join(' ');
+        return `${i + 1}.  ${bits || '–'}${s.rpe ? ` @ RPE ${s.rpe}` : ''}`;
       });
     case 'boulder':
     case 'rope_redpoint':

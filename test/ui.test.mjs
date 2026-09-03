@@ -125,6 +125,7 @@ await step('finger set has grip + apparatus, fill a rep', async () => {
   const card = page.locator('.entry-card[data-cat=finger]');
   await card.locator('select[data-f=grip]').first().selectOption('half crimp');
   await card.locator('select[data-f=apparatus]').first().selectOption('hb_bimanual');
+  await card.locator('input[data-f=implement]').first().fill('unlevel edge');
   await card.locator('input[data-f=load]').first().fill('40');
   await card.locator('input[data-f=durationSec]').first().fill('10');
   await card.locator('input[data-f=rpe]').first().fill('9');
@@ -155,6 +156,28 @@ await step('add rope endurance laps', async () => {
   await card.locator('input[data-f=laps]').first().fill('4');
   await card.locator('input[data-f=timeSec]').first().fill('3:30');
 });
+await step('create a Rehab exercise and log timed-hold sets', async () => {
+  await page.click('#tab-nav button[data-tab=library]');
+  await page.waitForTimeout(250);
+  await page.fill('#new-ex-name', 'Iso Wrist Extension');
+  await page.selectOption('#new-ex-cat', 'rehab');
+  await page.waitForTimeout(150);
+  await page.click('#new-ex-add');
+  await page.waitForTimeout(300);
+  await page.click('#tab-nav button[data-tab=log]');
+  await page.waitForTimeout(250);
+  await page.locator('#tab-log .pill', { hasText: 'Rehab' }).click();
+  await page.locator('#tab-log .chip', { hasText: 'Iso Wrist Extension' }).click();
+  await page.waitForSelector('.entry-card[data-cat=rehab]');
+  const rows = page.locator('.entry-card[data-cat=rehab] .set-row');
+  if (await rows.count() !== 3) throw new Error('expected 3 rehab sets');
+  for (let i = 0; i < 3; i++) {
+    await rows.nth(i).locator('input[data-f=load]').fill('30');
+    await rows.nth(i).locator('input[data-f=durationSec]').fill('20');
+    await rows.nth(i).locator('input[data-f=rpe]').fill('6');
+  }
+});
+
 await page.setViewportSize({ width: 480, height: 1400 });
 await page.waitForTimeout(200);
 await page.screenshot({ path: path.join(ROOT, 'test/screenshots/populated.png'), fullPage: true });
@@ -164,7 +187,7 @@ await step('draft persisted to localStorage', async () => {
   const draft = await page.evaluate(() => localStorage.getItem('tl_draft_testuser'));
   if (!draft) throw new Error('no draft saved');
   const d = JSON.parse(draft);
-  if (d.entries.length !== 4) throw new Error('draft has ' + d.entries.length + ' entries, expected 4');
+  if (d.entries.length !== 5) throw new Error('draft has ' + d.entries.length + ' entries, expected 5');
 });
 await step('save session', async () => {
   await page.fill('#sess-notes', 'test session');
@@ -188,6 +211,12 @@ await step('normalized data shapes are correct', async () => {
   if (finger.sets[0].reps[0].durationSec !== 10) throw new Error('hang duration wrong');
   const boulder = e.find(x => x.category === 'boulder');
   if (boulder.outcome !== 'flash' || boulder.attempts !== 1) throw new Error('flash wrong: ' + JSON.stringify(boulder));
+  if (finger.sets[0].implement !== 'unlevel edge') throw new Error('implement not stored: ' + finger.sets[0].implement);
+  const rehab = e.find(x => x.category === 'rehab');
+  if (!rehab) throw new Error('no rehab entry saved');
+  if (rehab.sets[0].load !== 30 || rehab.sets[0].durationSec !== 20 || rehab.sets[0].reps !== null) {
+    throw new Error('rehab set wrong: ' + JSON.stringify(rehab.sets[0]));
+  }
   const laps = e.find(x => x.category === 'rope_endurance');
   if (laps.sets[0].timeSec !== 210) throw new Error('mm:ss not parsed, got ' + laps.sets[0].timeSec);
 });
@@ -211,7 +240,7 @@ await step('edit loads session back into Log tab', async () => {
   const banner = await page.locator('.edit-banner').count();
   if (!banner) throw new Error('no edit banner');
   const cards = await page.locator('#tab-log .entry-card').count();
-  if (cards !== 4) throw new Error('expected 4 entries loaded, got ' + cards);
+  if (cards !== 5) throw new Error('expected 5 entries loaded, got ' + cards);
   await page.click('#cancel-edit-btn');
   await page.waitForTimeout(200);
 });
@@ -298,6 +327,30 @@ await step('laps chart config: one point per set w/ laps+time in point', async (
   const pt = cfg.data.datasets[0].data[0];
   if (pt.grade !== '5.11a' || pt.laps !== 4 || pt.timeSec !== 210) {
     throw new Error('lap point wrong: ' + JSON.stringify(pt));
+  }
+});
+
+await step('rehab chart renders with its own metrics', async () => {
+  await page.locator('#tab-progress .pill', { hasText: 'Rehab' }).click();
+  await page.waitForTimeout(300);
+  await page.locator('#tab-progress .chip', { hasText: 'Iso Wrist Extension' }).click();
+  await page.waitForTimeout(500);
+  const metrics = await page.locator('#tab-progress [data-prog-metric]').allInnerTexts();
+  if (!metrics.includes('Duration')) throw new Error('rehab should offer a Duration metric, got ' + metrics.join(','));
+  const stats = await page.locator('#prog-stats').innerText();
+  if (!stats.includes('30')) throw new Error('expected best load 30, got: ' + stats.replace(/\n/g, ' '));
+});
+await step('finger tooltip carries grip / implement / apparatus', async () => {
+  await page.locator('#tab-progress .pill', { hasText: 'Finger Training' }).click();
+  await page.waitForTimeout(500);
+  const cfg = await page.evaluate(() => {
+    const c = window.__CHARTS[window.__CHARTS.length - 1];
+    const cb = c.options.plugins.tooltip.callbacks.afterBody;
+    return cb([{ dataIndex: 0 }]);
+  });
+  const joined = cfg.join(' | ');
+  for (const want of ['half crimp', 'unlevel edge', 'Hangboard']) {
+    if (!joined.includes(want)) throw new Error(`tooltip missing "${want}": ${joined}`);
   }
 });
 

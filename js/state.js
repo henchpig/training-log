@@ -2,6 +2,7 @@ export const CATEGORIES = {
   sc: 'Strength & Conditioning',
   finger: 'Finger Training',
   cardio: 'Cardio',
+  rehab: 'Rehab',
   boulder: 'Bouldering',
   rope_redpoint: 'Rope Redpoint',
   rope_endurance: 'Rope Endurance Laps'
@@ -10,13 +11,13 @@ export const CATEGORIES = {
 // Categories with a reusable, user-managed exercise library. Finger training is
 // excluded on purpose: protocol + grip + apparatus fully describe the work, so a
 // library entry would only be a redundant name.
-export const LIBRARY_CATEGORIES = ['sc', 'cardio'];
+export const LIBRARY_CATEGORIES = ['sc', 'cardio', 'rehab'];
 
 export const STIMULI = ['strength', 'power', 'power_endurance', 'endurance', 'capacity'];
 export const MOVEMENTS = ['push', 'pull', 'hinge', 'squat', 'hold'];
 export const TARGETS = ['legs', 'arms', 'chest', 'back', 'hips', 'core'];
 export const CARDIO_TYPES = ['bike', 'run', 'row', 'swim', 'hike', 'other'];
-export const GRIPS = ['half crimp', 'full crimp', 'open', '3 finger drag', 'pocket', 'mono'];
+export const GRIPS = ['half crimp', 'full crimp', 'open', '3 finger drag', 'pocket', 'mono', 'pinch'];
 export const FINGER_PROTOCOLS = {
   max_hang: 'Max Hang',
   density_hang: 'Density Hang',
