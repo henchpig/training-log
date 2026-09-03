@@ -5,8 +5,7 @@
       "queryScope": "COLLECTION_GROUP",
       "fields": [
         { "fieldPath": "uid", "order": "ASCENDING" },
-        { "fieldPath": "exerciseId", "order": "ASCENDING" },
-        { "fieldPath": "date", "order": "ASCENDING" }
+        { "fieldPath": "exerciseId", "order": "ASCENDING" }
       ]
     },
     {
@@ -14,8 +13,7 @@
       "queryScope": "COLLECTION_GROUP",
       "fields": [
         { "fieldPath": "uid", "order": "ASCENDING" },
-        { "fieldPath": "category", "order": "ASCENDING" },
-        { "fieldPath": "date", "order": "ASCENDING" }
+        { "fieldPath": "category", "order": "ASCENDING" }
       ]
     }
   ],

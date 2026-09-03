@@ -51,7 +51,10 @@ export async function saveSession(session) {
 }
 export async function deleteSession(id) { sessions = sessions.filter(s=>s.id!==id); entries = entries.filter(e=>e.sessionId!==id); }
 export async function fetchEntriesByExercise(exerciseId) { return entries.filter(e=>e.exerciseId===exerciseId).map(e=>({...e})).sort((a,b)=>a.date.localeCompare(b.date)); }
-export async function fetchEntriesByCategory(category) { return entries.filter(e=>e.category===category).map(e=>({...e})).sort((a,b)=>a.date.localeCompare(b.date)); }
+export async function fetchEntriesByCategory(category) {
+  if (window.__FAIL_INDEX) {
+    throw new Error('The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/x/firestore/indexes?create_composite=abc');
+  } return entries.filter(e=>e.category===category).map(e=>({...e})).sort((a,b)=>a.date.localeCompare(b.date)); }
 window.__DB = { get exercises(){return exercises}, get sessions(){return sessions}, get entries(){return entries} };
 `;
 
@@ -352,6 +355,17 @@ await step('finger tooltip carries grip / implement / apparatus', async () => {
   for (const want of ['half crimp', 'unlevel edge', 'Hangboard']) {
     if (!joined.includes(want)) throw new Error(`tooltip missing "${want}": ${joined}`);
   }
+});
+
+await step('missing-index error surfaces a create link, not a crash', async () => {
+  await page.evaluate(() => { window.__FAIL_INDEX = true; });
+  await page.locator('#tab-progress .pill', { hasText: 'Bouldering' }).click();
+  await page.waitForTimeout(500);
+  const txt = await page.locator('#tab-progress').innerText();
+  if (!txt.includes('needs a Firestore index')) throw new Error('no index message: ' + txt.slice(0, 200));
+  const href = await page.locator('#tab-progress .chart-wrap a').getAttribute('href');
+  if (!href.startsWith('https://console.firebase.google.com/')) throw new Error('bad link: ' + href);
+  await page.evaluate(() => { window.__FAIL_INDEX = false; });
 });
 
 console.log('\n--- LIBRARY TAB ---');
