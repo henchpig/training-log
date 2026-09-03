@@ -100,6 +100,13 @@ Only the grade *picker* shortens the labels — you choose `9` or `12a`, and it 
 back everywhere as `5.9` / `5.12a`. See `gradeLabel` in `state.js`; it's a display
 concern only, so nothing downstream has to translate.
 
+## Redpoint pyramid
+`REDPOINT_PYRAMID` in `state.js` defines the tiers, apex first — 1× 5.13a, 2× 5.12d,
+4× 5.12c, 8× 5.12b, 10× 5.11d-or-5.12a. A tier lists several grades when they count
+together. Only sends (`send` or `flash`) fill a slot; attempts never do. Sends drop
+into their tier oldest-first, and a tier holding more sends than slots shows the
+surplus as `+n` rather than growing.
+
 ## Progress queries
 - S&C / Cardio / Finger: `collectionGroup('entries').where('uid','==',uid).where('exerciseId','==',id)`,
   sorted client-side by `date`. Finger additionally filters by `protocol` (and optionally `grip`)

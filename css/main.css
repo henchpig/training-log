@@ -79,6 +79,23 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
 /* Separates the category row from whatever it drills into. */
 .sub-picker{margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
 .chart-note{margin-top:10px;font-size:11px;color:var(--muted);line-height:1.5}
+
+/* ── Redpoint pyramid ── */
+.chart-wrap.is-pyramid{height:auto}
+.pyramid{display:flex;flex-direction:column;gap:8px;padding:4px 0}
+.pyr-row{display:flex;align-items:center;gap:8px}
+.pyr-label{flex:0 0 74px;font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right}
+.pyr-count{flex:0 0 44px;font-family:var(--mono);font-size:11px;color:var(--dim)}
+.pyr-blocks{flex:1;display:flex;gap:4px;justify-content:center;min-width:0}
+.pyr-block{flex:1 1 0;min-width:0;max-width:34px;aspect-ratio:1;border-radius:4px;
+  border:1px solid var(--border);background:var(--surface2);padding:0}
+.pyr-block.filled{background:var(--rope);border-color:var(--rope);cursor:pointer}
+.pyr-block.filled:hover{opacity:.85}
+.pyr-block.picked{outline:2px solid var(--text);outline-offset:1px}
+.pyr-detail{margin-top:12px;padding:10px 12px;background:var(--surface2);
+  border-radius:var(--radius);font-size:12px;color:var(--muted);min-height:44px}
+.pyr-detail-grade{font-size:14px;color:var(--text);font-weight:500;margin-bottom:2px}
+.pyr-detail-meta{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.6}
 /* Column names for a set list — placeholders disappear once a box is filled. */
 .set-head{display:flex;gap:6px;align-items:center;padding:0 8px 4px;font-size:10px;
   color:var(--dim);text-transform:uppercase;letter-spacing:.4px}
@@ -146,6 +163,10 @@ nav button{min-height:44px}
             box-shadow:0 -8px 12px -6px rgba(0,0,0,.7)}
 
   .set-row input,.set-row select{min-width:70px}
+  .pyr-label{flex:0 0 62px;font-size:10px}
+  .pyr-count{flex:0 0 38px;font-size:10px}
+  .pyr-block{max-width:26px;border-radius:3px}
+  .pyr-blocks{gap:3px}
   .entry-body{padding:10px}
   .field-row{gap:6px}
 }

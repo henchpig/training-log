@@ -1,6 +1,7 @@
 import { S, CATEGORIES, LIBRARY_CATEGORIES, FINGER_PROTOCOLS, APPARATUS, gradeScale } from './state.js';
 import { esc, fmtSecAsMMSS, fmtDate } from './utils.js';
 import { fetchEntriesByExercise, fetchEntriesByCategory } from './db.js';
+import { renderPyramid } from './pyramid.js';
 
 const C = {
   green: '#4ecdc4', amber: '#f7b731', red: '#fc5c65', blue: '#74b9ff',
@@ -112,6 +113,17 @@ async function refresh() {
       p.grip = null;
       renderProgress();
     });
+  } else if (p.category === 'rope_redpoint') {
+    sub.innerHTML = `<div class="sub-picker">
+      <div class="pill-row" style="margin-bottom:0">
+        <span class="pill${p.redpointView === 'chart' ? ' active' : ''}" data-prog-view="chart">Chart</span>
+        <span class="pill${p.redpointView === 'pyramid' ? ' active' : ''}" data-prog-view="pyramid">Pyramid</span>
+      </div>
+    </div>`;
+    sub.querySelectorAll('[data-prog-view]').forEach(n => n.onclick = () => {
+      p.redpointView = n.dataset.progView;
+      renderProgress();
+    });
   } else {
     sub.innerHTML = '';
   }
@@ -124,6 +136,7 @@ async function refresh() {
   }
   if (!entries.length) return setEmpty('No data yet');
 
+  if (p.category === 'rope_redpoint' && p.redpointView === 'pyramid') return showPyramid(entries);
   if (p.category === 'boulder' || p.category === 'rope_redpoint') return drawClimbChart(entries);
   if (p.category === 'rope_endurance') return drawLapsChart(entries);
   if (p.category === 'finger') return drawFingerChart(entries);
@@ -150,6 +163,7 @@ async function loadEntries() {
 // ── Chart plumbing ───────────────────────────────────────────
 function setEmpty(msg) {
   if (chart) { chart.destroy(); chart = null; }
+  document.querySelector('#tab-progress .chart-wrap')?.classList.remove('is-pyramid');
   document.getElementById('prog-stats').innerHTML = '';
   document.getElementById('prog-legend').innerHTML = '';
   document.querySelector('#tab-progress .chart-wrap').innerHTML =
@@ -158,6 +172,7 @@ function setEmpty(msg) {
 
 function resetCanvas() {
   const wrap = document.querySelector('#tab-progress .chart-wrap');
+  wrap.classList.remove('is-pyramid');
   wrap.innerHTML = '<canvas id="prog-chart"></canvas>';
   return document.getElementById('prog-chart').getContext('2d');
 }
@@ -395,6 +410,18 @@ function drawFingerChart(entries) {
     ['Best load', Math.max(...dates.map(d => byDate.get(d).values.load))],
     ['Latest load', byDate.get(dates[dates.length - 1]).values.load]
   ]);
+}
+
+// ── Redpoint pyramid ─────────────────────────────────────────
+function showPyramid(entries) {
+  if (chart) { chart.destroy(); chart = null; }
+  document.getElementById('prog-stats').innerHTML = '';
+  document.getElementById('prog-legend').innerHTML = '';
+  // The pyramid isn't a chart — give it the whole card, unconstrained by the
+  // fixed chart height.
+  const wrap = document.querySelector('#tab-progress .chart-wrap');
+  wrap.classList.add('is-pyramid');
+  renderPyramid(entries, wrap);
 }
 
 // ── Bouldering / Rope Redpoint ───────────────────────────────
