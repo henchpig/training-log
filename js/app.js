@@ -5,6 +5,7 @@ import { renderLibrary } from './library.js';
 import { renderLog, newSession, loadDraft } from './log.js';
 import { loadHistory } from './history.js';
 import { renderProgress, invalidateProgressCache } from './progress.js';
+import { renderPyramidTab } from './pyramid.js';
 import { toast } from './utils.js';
 
 const show = (id, on) => { document.getElementById(id).style.display = on ? (id === 'auth-screen' ? 'flex' : 'block') : 'none'; };
@@ -19,6 +20,7 @@ function switchTab(name, btn) {
   if (name === 'log') renderLog();
   if (name === 'history') loadHistory();
   if (name === 'progress') { invalidateProgressCache(); renderProgress(); }
+  if (name === 'pyramid') renderPyramidTab();
   if (name === 'library') renderLibrary();
 }
 

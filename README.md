@@ -16,7 +16,8 @@ js/
   auth.js             email/password sign in
   log.js              Log tab — session builder, all five entry shapes
   history.js          History tab — session list, detail, edit, delete
-  progress.js         Progress tab — six chart types
+  progress.js         Progress tab — charts
+  pyramid.js          Pyramid tab — redpoint pyramid
   library.js          Library tab — S&C + cardio exercise CRUD
   format.js           shared entry → display-text formatting
   utils.js
@@ -81,7 +82,8 @@ npm test
 Drives the real UI in headless Chromium with the Firebase boundary (`auth.js`,
 `db.js`) and the Chart.js CDN swapped for in-memory stubs — so it needs no Firebase
 project and no network. Covers all five entry shapes, draft autosave, save/edit/delete
-round-trips, and every progress chart's config. Screenshots land in `test/screenshots/`.
+round-trips, the redpoint pyramid, the mobile layout, and every progress chart's
+config. Screenshots land in `test/screenshots/`.
 
 ## Notes
 
@@ -108,6 +110,10 @@ round-trips, and every progress chart's config. Screenshots land in `test/screen
 - **Built for a phone.** Tab bar sits at the bottom within thumb reach, the Save
   button sticks above it, inputs are 16px so iOS doesn't zoom when you focus one,
   and set columns are labelled — placeholders disappear once a box has a number in it.
+- **Redpoint pyramid** has its own tab. Tiers come from `REDPOINT_PYRAMID` in
+  `state.js`; edit that array to change the shape. Only sends fill blocks, a send counts
+  toward its own tier only, and blocks fill oldest-first. Tap a filled block (or hover on
+  desktop) for its date, grade, name and attempts.
 - **Climbs aren't library items either.** Name is optional free text (autocompleting from
   your own history) — it's shorthand for your memory, not a tracked entity. Grade,
   outcome and attempts are what get charted.

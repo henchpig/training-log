@@ -4,8 +4,8 @@ Firestore, scoped per user under `users/{uid}/...`. All docs get `uid` denormali
 onto them so collection-group queries (used by Progress) can be secured with rules.
 
 ## users/{uid}/exercises/{exerciseId}
-Reusable named exercises. Only used by categories `sc`, `cardio`, `finger`.
-Bouldering / rope never reference this collection.
+Reusable named exercises. Only used by categories `sc`, `cardio`, `rehab`.
+Finger training, bouldering and rope never reference this collection.
 
 ```
 {
@@ -57,7 +57,6 @@ sets: [{ workSec, restSec, reps, distance|null }]
 
 **category: 'finger'**
 ```
-exerciseId, exerciseName,
 protocol: 'max_hang' | 'density_hang' | 'repeaters' | 'pulses',
 sets: [ ... shape depends on protocol, see below ]
 ```
@@ -95,20 +94,28 @@ sets: [{ grade, laps, timeSec, rpe }]
 ```
 
 ## Grades
-Boulder uses the V scale. Rope is stored and displayed as full YDS (`5.9`, `5.12a`).
-Only the grade *picker* shortens the labels — you choose `9` or `12a`, and it reads
-back everywhere as `5.9` / `5.12a`. See `gradeLabel` in `state.js`; it's a display
-concern only, so nothing downstream has to translate.
+Boulder uses the V scale, rope full YDS (`5.9`, `5.12a`) — stored, displayed and
+picked the same way, with no translation layer.
+
+## Redpoint pyramid
+Its own tab, rendered by `pyramid.js` from the `rope_redpoint` entries.
+`REDPOINT_PYRAMID` in `state.js` defines the tiers, apex first — 1× 5.13a, 2× 5.12d,
+4× 5.12c, 8× 5.12b, 10× 5.11d-or-5.12a. A tier lists several grades when they count
+together. Only sends (`send` or `flash`) fill a slot; attempts never do. Sends drop
+into their tier oldest-first, and a tier holding more sends than slots shows the
+surplus as `+n` rather than growing.
 
 ## Progress queries
 - S&C / Cardio / Finger: `collectionGroup('entries').where('uid','==',uid).where('exerciseId','==',id)`,
   sorted client-side by `date`. Finger additionally filters by `protocol` (and optionally `grip`)
   since Max Hang / Density Hang / Repeaters / Pulses are separate charts.
-- Rehab: per exercise, metrics load / duration / reps.
-- S&C metrics are load / reps / total work / est 1RM. Est 1RM is derived per set with
-  Epley (`load × (1 + reps/30)`), never stored — a stored copy only drifts from the
-  load and reps it came from.
+- Every metric for a category is drawn on one chart, each on its own axis, rather than
+  toggled between: S&C is load / reps / total work, rehab load / duration / reps, cardio
+  distance / time / pace, finger load plus duration or reps. Only the first two axes get
+  a visible ruler; the rest stay in the legend and tooltip.
+- Finger charts one grip at a time, chosen by tab, with the tabs built from the grips
+  actually logged for that protocol.
 - The per-session charts plot the best set of each day; hovering a point shows that
-  set's details (grip, implement, apparatus, load, duration, RPE).
+  set's details (implement, apparatus, load, duration, RPE).
 - Boulder / Rope Redpoint / Rope Endurance: `collectionGroup('entries').where('uid','==',uid).where('category','==','boulder'|'rope_redpoint'|'rope_endurance')`,
   sorted client-side by `date`. Rope Endurance additionally flattens `sets` (one point per set).

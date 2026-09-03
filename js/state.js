@@ -38,6 +38,16 @@ export const gradeScale = cat => cat === 'boulder' ? V_GRADES : YDS_GRADES;
 
 export const OUTCOMES = { flash: 'Flash', send: 'Send', attempt: 'Attempt' };
 
+// Redpoint pyramid, apex first. A tier can accept more than one grade — the base
+// counts 5.11d and 5.12a together. Only sends fill a slot; attempts never do.
+export const REDPOINT_PYRAMID = [
+  { grades: ['5.13a'], slots: 1 },
+  { grades: ['5.12d'], slots: 2 },
+  { grades: ['5.12c'], slots: 4 },
+  { grades: ['5.12b'], slots: 8 },
+  { grades: ['5.11d', '5.12a'], slots: 10 }
+];
+
 export const S = {
   user: null,
   exercises: [],
@@ -47,5 +57,5 @@ export const S = {
   log: { addCat: 'sc', search: '' },
   history: { items: [], catFilter: '', view: 'list', detailId: null },
   library: { catFilter: '', search: '', editingId: null },
-  progress: { category: 'sc', exerciseId: null, metric: null, protocol: null, grip: '' }
+  progress: { category: 'sc', exerciseId: null, protocol: null, grip: null }
 };

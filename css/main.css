@@ -79,6 +79,31 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
 /* Separates the category row from whatever it drills into. */
 .sub-picker{margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
 .chart-note{margin-top:10px;font-size:11px;color:var(--muted);line-height:1.5}
+
+/* ── Redpoint pyramid ──
+   Grade sits above its row rather than beside it, so the ten blocks of the base
+   tier get the full width of a phone instead of sharing it with a label. */
+.pyr-summary{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.pyr-summary-num{font-family:var(--mono);font-size:30px;color:var(--rope);line-height:1}
+.pyr-summary-num span{font-size:16px;color:var(--dim)}
+.pyr-summary-next{text-align:right;font-size:11px;color:var(--muted);line-height:1.6}
+.pyr-summary-next strong{font-family:var(--mono);font-size:15px;color:var(--text);font-weight:500}
+.pyr-summary-next span{display:block;color:var(--dim)}
+.pyramid{display:flex;flex-direction:column;gap:14px;padding:2px 0}
+.pyr-row{display:flex;flex-direction:column;gap:5px}
+.pyr-head{display:flex;align-items:baseline;justify-content:space-between}
+.pyr-label{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.pyr-count{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.pyr-blocks{display:flex;gap:5px;justify-content:center}
+.pyr-block{flex:1 1 0;min-width:0;max-width:46px;aspect-ratio:1;border-radius:5px;
+  border:1px solid var(--border);background:var(--surface2);padding:0}
+.pyr-block.filled{background:var(--rope);border-color:var(--rope);cursor:pointer}
+.pyr-block.filled:hover{opacity:.85}
+.pyr-block.picked{outline:2px solid var(--text);outline-offset:1px}
+.pyr-detail{margin-top:12px;padding:10px 12px;background:var(--surface2);
+  border-radius:var(--radius);font-size:12px;color:var(--muted);min-height:44px}
+.pyr-detail-grade{font-size:14px;color:var(--text);font-weight:500;margin-bottom:2px}
+.pyr-detail-meta{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.6}
 /* Column names for a set list — placeholders disappear once a box is filled. */
 .set-head{display:flex;gap:6px;align-items:center;padding:0 8px 4px;font-size:10px;
   color:var(--dim);text-transform:uppercase;letter-spacing:.4px}
@@ -146,6 +171,10 @@ nav button{min-height:44px}
             box-shadow:0 -8px 12px -6px rgba(0,0,0,.7)}
 
   .set-row input,.set-row select{min-width:70px}
+  .pyramid{gap:12px}
+  .pyr-blocks{gap:4px}
+  .pyr-block{max-width:34px;border-radius:4px}
+  .pyr-summary-num{font-size:26px}
   .entry-body{padding:10px}
   .field-row{gap:6px}
 }
