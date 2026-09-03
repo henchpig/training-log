@@ -95,9 +95,10 @@ sets: [{ grade, laps, timeSec, rpe }]
 ```
 
 ## Grades
-Boulder uses the V scale. Rope uses YDS in climber shorthand — the `5.` prefix is
-written out only below 5.10, so the scale runs `5.6 … 5.9, 10a, 10b … 15a`. Stored
-exactly as displayed; there is no translation layer.
+Boulder uses the V scale. Rope is stored and displayed as full YDS (`5.9`, `5.12a`).
+Only the grade *picker* shortens the labels — you choose `9` or `12a`, and it reads
+back everywhere as `5.9` / `5.12a`. See `gradeLabel` in `state.js`; it's a display
+concern only, so nothing downstream has to translate.
 
 ## Progress queries
 - S&C / Cardio / Finger: `collectionGroup('entries').where('uid','==',uid).where('exerciseId','==',id)`,

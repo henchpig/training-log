@@ -1,6 +1,6 @@
 import {
   S, CATEGORIES, LIBRARY_CATEGORIES, GRIPS, FINGER_PROTOCOLS, APPARATUS,
-  OUTCOMES, gradeScale
+  OUTCOMES, gradeScale, gradeLabel
 } from './state.js';
 import { esc, toast, todayStr, uid, parseDuration, debounce } from './utils.js';
 import { saveSession } from './db.js';
@@ -356,7 +356,7 @@ function climbBody(e, i) {
       <div class="field" style="flex:0 0 90px"><label>Grade</label>
         <select data-e="${i}" data-f="grade">
           <option value="">—</option>
-          ${grades.map(g => `<option value="${g}"${e.grade === g ? ' selected' : ''}>${g}</option>`).join('')}
+          ${grades.map(g => `<option value="${g}"${e.grade === g ? ' selected' : ''}>${gradeLabel(g)}</option>`).join('')}
         </select>
       </div>
       <div class="field wide"><label>Name (optional)</label>
@@ -379,7 +379,7 @@ function lapsBody(e, i) {
         <span class="set-num">${si + 1}</span>
         <select data-e="${i}" data-s="${si}" data-f="grade" style="flex:0 0 90px">
           <option value="">grade</option>
-          ${gradeScale('rope_endurance').map(g => `<option value="${g}"${s.grade === g ? ' selected' : ''}>${g}</option>`).join('')}
+          ${gradeScale('rope_endurance').map(g => `<option value="${g}"${s.grade === g ? ' selected' : ''}>${gradeLabel(g)}</option>`).join('')}
         </select>
         <input type="number" placeholder="laps" value="${esc(s.laps)}" data-e="${i}" data-s="${si}" data-f="laps">
         <input type="text" placeholder="mm:ss" value="${esc(s.timeSec)}" data-e="${i}" data-s="${si}" data-f="timeSec">
