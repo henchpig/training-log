@@ -1,6 +1,6 @@
 import {
   S, CATEGORIES, LIBRARY_CATEGORIES, GRIPS, FINGER_PROTOCOLS, APPARATUS,
-  OUTCOMES, gradeScale, gradeLabel
+  OUTCOMES, gradeScale
 } from './state.js';
 import { esc, toast, todayStr, uid, parseDuration, debounce } from './utils.js';
 import { saveSession } from './db.js';
@@ -170,7 +170,7 @@ export function renderLog() {
 
     ${renderAddPanel()}
 
-    <div style="display:flex;gap:8px;margin-top:10px">
+    <div class="save-bar">
       <button class="btn btn-primary btn-block" id="save-session-btn">${S.editingSessionId ? 'Update Session' : 'Save Session'}</button>
       <button class="btn btn-block" style="max-width:110px;color:var(--red)" id="clear-session-btn">Clear</button>
     </div>`;
@@ -214,9 +214,18 @@ function entryBody(e, i) {
 // negative, taken off) bodyweight. Blank/0 means straight bodyweight.
 const WEIGHT_TYPES = { absolute: 'lb', relative: 'BW±' };
 
+// Placeholders vanish once a box has a value, which on a phone leaves a row of
+// unlabelled numbers. A header keeps the columns readable.
+const setHead = (...labels) => `
+  <div class="set-head"><span class="set-num"></span>
+    ${labels.map(l => `<span>${l}</span>`).join('')}
+    <span class="spacer-btn"></span>
+  </div>`;
+
 function scBody(e, i) {
   return `
     <div class="section-label" style="margin-bottom:4px">Sets</div>
+    ${setHead('type', 'weight', 'reps', 'RPE')}
     ${e.sets.map((s, si) => `
       <div class="set-row">
         <span class="set-num">${si + 1}</span>
@@ -251,6 +260,7 @@ function cardioBody(e, i) {
         <div class="field"><label>Time (mm:ss)</label><input type="text" placeholder="32:00" value="${esc(e.endurance.timeSec)}" data-e="${i}" data-f="endurance.timeSec"></div>
       </div>` : `
       <div class="section-label" style="margin-bottom:4px">Interval sets</div>
+      ${setHead('work s', 'rest s', 'reps', 'dist')}
       ${e.sets.map((s, si) => `
         <div class="set-row">
           <span class="set-num">${si + 1}</span>
@@ -268,7 +278,7 @@ function gripApparatusFields(s, i, si) {
     <select data-e="${i}" data-s="${si}" data-f="grip" style="flex:1 1 110px">
       ${GRIPS.map(g => `<option value="${esc(g)}"${s.grip === g ? ' selected' : ''}>${esc(g)}</option>`).join('')}
     </select>
-    <select data-e="${i}" data-s="${si}" data-f="apparatus" style="flex:1 1 130px">
+    <select data-e="${i}" data-s="${si}" data-f="apparatus" style="flex:1 1 165px">
       ${Object.entries(APPARATUS).map(([v, l]) => `<option value="${v}"${s.apparatus === v ? ' selected' : ''}>${l}</option>`).join('')}
     </select>
     <input type="text" list="implements" placeholder="implement" value="${esc(s.implement)}" data-e="${i}" data-s="${si}" data-f="implement" style="flex:1 1 120px">`;
@@ -277,6 +287,7 @@ function gripApparatusFields(s, i, si) {
 function rehabBody(e, i) {
   return `
     <div class="section-label" style="margin-bottom:4px">Sets — fill what applies</div>
+    ${setHead('load', 'reps', 'secs', 'RPE')}
     ${e.sets.map((s, si) => `
       <div class="set-row">
         <span class="set-num">${si + 1}</span>
@@ -301,6 +312,7 @@ function fingerBody(e, i) {
             <input type="text" placeholder="rest" value="${esc(s.restSec)}" data-e="${i}" data-s="${si}" data-f="restSec" style="flex:0 0 70px">
             <button class="btn-danger" data-act="del-set" data-e="${i}" data-s="${si}">✕</button>
           </div>
+          ${setHead('load', 'secs', 'RPE')}
           ${s.reps.map((r, ri) => `
             <div class="set-row">
               <span class="set-num">·${ri + 1}</span>
@@ -322,6 +334,7 @@ function fingerBody(e, i) {
             ${gripApparatusFields(s, i, si)}
             <button class="btn-danger" data-act="del-set" data-e="${i}" data-s="${si}">✕</button>
           </div>
+          ${setHead('load', 'work s', 'rest s', 'reps')}
           <div class="set-row">
             <input type="number" step="0.5" placeholder="load" value="${esc(s.load)}" data-e="${i}" data-s="${si}" data-f="load">
             <input type="text" placeholder="work s" value="${esc(s.workSec)}" data-e="${i}" data-s="${si}" data-f="workSec">
@@ -339,6 +352,7 @@ function fingerBody(e, i) {
           ${gripApparatusFields(s, i, si)}
           <button class="btn-danger" data-act="del-set" data-e="${i}" data-s="${si}">✕</button>
         </div>
+        ${setHead('load', 'reps', 'RPE')}
         <div class="set-row">
           <input type="number" step="0.5" placeholder="load" value="${esc(s.load)}" data-e="${i}" data-s="${si}" data-f="load">
           <input type="number" placeholder="reps" value="${esc(s.reps)}" data-e="${i}" data-s="${si}" data-f="reps">
@@ -356,7 +370,7 @@ function climbBody(e, i) {
       <div class="field" style="flex:0 0 90px"><label>Grade</label>
         <select data-e="${i}" data-f="grade">
           <option value="">—</option>
-          ${grades.map(g => `<option value="${g}"${e.grade === g ? ' selected' : ''}>${gradeLabel(g)}</option>`).join('')}
+          ${grades.map(g => `<option value="${g}"${e.grade === g ? ' selected' : ''}>${g}</option>`).join('')}
         </select>
       </div>
       <div class="field wide"><label>Name (optional)</label>
@@ -374,12 +388,13 @@ function climbBody(e, i) {
 function lapsBody(e, i) {
   return `
     <div class="section-label" style="margin-bottom:4px">Lap sets</div>
+    ${setHead('grade', 'laps', 'time', 'RPE')}
     ${e.sets.map((s, si) => `
       <div class="set-row">
         <span class="set-num">${si + 1}</span>
         <select data-e="${i}" data-s="${si}" data-f="grade" style="flex:0 0 90px">
           <option value="">grade</option>
-          ${gradeScale('rope_endurance').map(g => `<option value="${g}"${s.grade === g ? ' selected' : ''}>${gradeLabel(g)}</option>`).join('')}
+          ${gradeScale('rope_endurance').map(g => `<option value="${g}"${s.grade === g ? ' selected' : ''}>${g}</option>`).join('')}
         </select>
         <input type="number" placeholder="laps" value="${esc(s.laps)}" data-e="${i}" data-s="${si}" data-f="laps">
         <input type="text" placeholder="mm:ss" value="${esc(s.timeSec)}" data-e="${i}" data-s="${si}" data-f="timeSec">

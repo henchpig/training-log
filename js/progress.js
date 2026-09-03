@@ -1,4 +1,4 @@
-import { S, CATEGORIES, LIBRARY_CATEGORIES, FINGER_PROTOCOLS, APPARATUS, GRIPS, gradeScale } from './state.js';
+import { S, CATEGORIES, LIBRARY_CATEGORIES, FINGER_PROTOCOLS, APPARATUS, gradeScale } from './state.js';
 import { esc, fmtSecAsMMSS, fmtDate } from './utils.js';
 import { fetchEntriesByExercise, fetchEntriesByCategory } from './db.js';
 
@@ -10,100 +10,126 @@ const C = {
 let chart = null;
 let cache = { key: null, entries: [] };
 
-const METRICS = {
-  sc: { load: 'Load', reps: 'Reps', work: 'Total Work', e1rm: 'Est 1RM' },
-  cardio: { distance: 'Distance', time: 'Time', pace: 'Pace' },
-  rehab: { load: 'Load', duration: 'Duration', reps: 'Reps' },
-  max_hang: { load: 'Load', duration: 'Duration' },
-  density_hang: { load: 'Load', duration: 'Duration' },
-  repeaters: { load: 'Load', reps: 'Reps' },
-  pulses: { load: 'Load', reps: 'Reps', work: 'Total Work' }
+// Every metric for a category is drawn on one chart, each on its own axis, so
+// they can be read against each other instead of toggled between. Only the
+// first two get a visible ruler — a third would crowd a phone screen — but all
+// are in the legend (click to hide) and the tooltip.
+const SERIES = {
+  sc: [
+    { key: 'load', label: 'Load (lb)', color: C.blue },
+    { key: 'reps', label: 'Reps', color: C.amber },
+    { key: 'work', label: 'Total work', color: C.purple }
+  ],
+  rehab: [
+    { key: 'load', label: 'Load (lb)', color: C.purple },
+    { key: 'duration', label: 'Duration (s)', color: C.green },
+    { key: 'reps', label: 'Reps', color: C.amber }
+  ],
+  cardio: [
+    { key: 'distance', label: 'Distance', color: C.pink },
+    { key: 'time', label: 'Time (min)', color: C.blue },
+    { key: 'pace', label: 'Pace (min/unit)', color: C.amber }
+  ],
+  max_hang: [
+    { key: 'load', label: 'Load (lb)', color: C.green },
+    { key: 'duration', label: 'Duration (s)', color: C.amber }
+  ],
+  density_hang: [
+    { key: 'load', label: 'Load (lb)', color: C.green },
+    { key: 'duration', label: 'Duration (s)', color: C.amber }
+  ],
+  repeaters: [
+    { key: 'load', label: 'Load (lb)', color: C.green },
+    { key: 'reps', label: 'Reps', color: C.amber }
+  ],
+  pulses: [
+    { key: 'load', label: 'Load (lb)', color: C.green },
+    { key: 'reps', label: 'Reps', color: C.amber }
+  ]
 };
 
-function defaultMetric(p) {
-  const set = METRICS[p.category === 'finger' ? p.protocol : p.category];
-  return set ? Object.keys(set)[0] : null;
-}
+const seriesFor = p => SERIES[p.category === 'finger' ? p.protocol : p.category];
 
 export function renderProgress() {
   const el = document.getElementById('tab-progress');
   const p = S.progress;
 
-  let picker = '';
-  if (LIBRARY_CATEGORIES.includes(p.category)) {
-    const list = S.exercises.filter(e => e.category === p.category);
-    picker = `<div class="chip-list">
-      ${list.length ? list.map(e =>
-        `<button class="chip${p.exerciseId === e.id ? ' active-chip' : ''}" data-prog-ex="${e.id}">${esc(e.name)}</button>`).join('')
-        : '<span style="color:var(--dim);font-size:12px">No exercises in library</span>'}
-    </div>`;
-  } else if (p.category === 'finger') {
-    picker = `
-      <div class="pill-row" style="margin-top:8px">
-        ${Object.entries(FINGER_PROTOCOLS).map(([v, l]) =>
-          `<span class="pill${p.protocol === v ? ' active' : ''}" data-prog-proto="${v}">${l}</span>`).join('')}
-      </div>
-      <div class="field" style="max-width:180px"><label>Grip filter</label>
-        <select id="prog-grip">
-          <option value="">all grips</option>
-          ${GRIPS.map(g => `<option value="${esc(g)}"${p.grip === g ? ' selected' : ''}>${esc(g)}</option>`).join('')}
-        </select>
-      </div>`;
-  }
-
-  const metricSet = METRICS[p.category === 'finger' ? p.protocol : p.category];
-  const metricRow = metricSet ? `
-    <div class="pill-row" style="margin-top:10px">
-      ${Object.entries(metricSet).map(([v, l]) =>
-        `<span class="pill${p.metric === v ? ' active' : ''}" data-prog-metric="${v}">${l}</span>`).join('')}
-    </div>` : '';
-
   el.innerHTML = `
     <div class="card">
       <div class="section-label">Category</div>
-      <div class="pill-row" style="margin-top:8px">
+      <div class="pill-row" style="margin-top:8px;margin-bottom:0">
         ${Object.entries(CATEGORIES).map(([v, l]) =>
           `<span class="pill${p.category === v ? ' active' : ''}" data-prog-cat="${v}">${l}</span>`).join('')}
       </div>
-      ${picker}
-      ${metricRow}
+      <div id="prog-sub"></div>
     </div>
     <div id="prog-stats"></div>
-    <div class="card"><div class="chart-wrap"><canvas id="prog-chart"></canvas></div>
-      <div id="prog-legend" style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--muted);flex-wrap:wrap"></div>
+    <div class="card">
+      <div class="chart-wrap"><canvas id="prog-chart"></canvas></div>
+      <div id="prog-legend" class="chart-note"></div>
     </div>`;
 
-  wireProgress();
-  drawChart();
-}
-
-function wireProgress() {
-  const el = document.getElementById('tab-progress');
   el.querySelectorAll('[data-prog-cat]').forEach(n => n.onclick = () => {
-    const p = S.progress;
     p.category = n.dataset.progCat;
     p.exerciseId = null;
     p.protocol = p.category === 'finger' ? 'max_hang' : null;
-    p.grip = '';
-    p.metric = defaultMetric(p);
+    p.grip = null;
     renderProgress();
   });
-  el.querySelectorAll('[data-prog-ex]').forEach(n => n.onclick = () => {
-    S.progress.exerciseId = n.dataset.progEx;
-    S.progress.metric = S.progress.metric || defaultMetric(S.progress);
-    renderProgress();
-  });
-  el.querySelectorAll('[data-prog-proto]').forEach(n => n.onclick = () => {
-    S.progress.protocol = n.dataset.progProto;
-    S.progress.metric = defaultMetric(S.progress);
-    renderProgress();
-  });
-  el.querySelectorAll('[data-prog-metric]').forEach(n => n.onclick = () => {
-    S.progress.metric = n.dataset.progMetric;
-    renderProgress();
-  });
-  const grip = document.getElementById('prog-grip');
-  if (grip) grip.onchange = () => { S.progress.grip = grip.value; renderProgress(); };
+
+  refresh();
+}
+
+// Sub-picker depends on the data (which grips were actually trained), so it is
+// rendered after the fetch rather than alongside the category row.
+async function refresh() {
+  const p = S.progress;
+  const sub = document.getElementById('prog-sub');
+
+  if (LIBRARY_CATEGORIES.includes(p.category)) {
+    const list = S.exercises.filter(e => e.category === p.category);
+    sub.innerHTML = `<div class="sub-picker">${
+      list.length ? `<div class="chip-list">${list.map(e =>
+        `<button class="chip${p.exerciseId === e.id ? ' active-chip' : ''}" data-prog-ex="${e.id}">${esc(e.name)}</button>`).join('')}</div>`
+        : '<span style="color:var(--dim);font-size:12px">No exercises in library</span>'
+    }</div>`;
+    sub.querySelectorAll('[data-prog-ex]').forEach(n => n.onclick = () => {
+      p.exerciseId = n.dataset.progEx;
+      renderProgress();
+    });
+    if (!p.exerciseId) return setEmpty('Pick an exercise');
+  } else if (p.category === 'finger') {
+    sub.innerHTML = `<div class="sub-picker">
+      <div class="section-label" style="margin-bottom:6px">Protocol</div>
+      <div class="pill-row">
+        ${Object.entries(FINGER_PROTOCOLS).map(([v, l]) =>
+          `<span class="pill${p.protocol === v ? ' active' : ''}" data-prog-proto="${v}">${l}</span>`).join('')}
+      </div>
+      <div id="prog-grips"></div>
+    </div>`;
+    sub.querySelectorAll('[data-prog-proto]').forEach(n => n.onclick = () => {
+      p.protocol = n.dataset.progProto;
+      p.grip = null;
+      renderProgress();
+    });
+  } else {
+    sub.innerHTML = '';
+  }
+
+  let entries;
+  try {
+    entries = await loadEntries();
+  } catch (err) {
+    return showQueryError(err);
+  }
+  if (!entries.length) return setEmpty('No data yet');
+
+  if (p.category === 'boulder' || p.category === 'rope_redpoint') return drawClimbChart(entries);
+  if (p.category === 'rope_endurance') return drawLapsChart(entries);
+  if (p.category === 'finger') return drawFingerChart(entries);
+  if (p.category === 'cardio') return drawCardioChart(entries);
+  if (p.category === 'rehab') return drawRehabChart(entries);
+  return drawSCChart(entries);
 }
 
 async function loadEntries() {
@@ -121,12 +147,13 @@ async function loadEntries() {
   return entries;
 }
 
+// ── Chart plumbing ───────────────────────────────────────────
 function setEmpty(msg) {
   if (chart) { chart.destroy(); chart = null; }
   document.getElementById('prog-stats').innerHTML = '';
   document.getElementById('prog-legend').innerHTML = '';
-  const wrap = document.querySelector('#tab-progress .chart-wrap');
-  wrap.innerHTML = `<div class="empty"><div class="empty-icon">📈</div>${msg}</div>`;
+  document.querySelector('#tab-progress .chart-wrap').innerHTML =
+    `<div class="empty"><div class="empty-icon">📈</div>${msg}</div>`;
 }
 
 function resetCanvas() {
@@ -135,8 +162,6 @@ function resetCanvas() {
   return document.getElementById('prog-chart').getContext('2d');
 }
 
-// Never let a charting failure (blocked CDN, bad data) take out the stats and
-// legend rendered alongside it.
 function safeChart(ctx, config) {
   if (chart) { chart.destroy(); chart = null; }
   if (typeof Chart === 'undefined') {
@@ -154,14 +179,12 @@ function safeChart(ctx, config) {
 }
 
 // Firestore rejects a collection-group query until its composite index exists,
-// and puts a one-click creation link in the message. Surface that instead of
-// failing silently with an unhandled rejection.
+// and puts a one-click creation link in the message. Surface that.
 function showQueryError(err) {
   const link = /https:\/\/console\.firebase\.google\.com\/\S+/.exec(err.message || '')?.[0];
-  const wrap = document.querySelector('#tab-progress .chart-wrap');
   document.getElementById('prog-stats').innerHTML = '';
   document.getElementById('prog-legend').innerHTML = '';
-  wrap.innerHTML = link
+  document.querySelector('#tab-progress .chart-wrap').innerHTML = link
     ? `<div class="empty" style="padding:24px">
          <div class="empty-icon">🔑</div>
          <div style="margin-bottom:10px">This chart needs a Firestore index.</div>
@@ -172,54 +195,6 @@ function showQueryError(err) {
     : `<div class="empty"><div class="empty-icon">⚠️</div>${esc(err.message || 'Could not load data')}</div>`;
 }
 
-async function drawChart() {
-  const p = S.progress;
-  if (LIBRARY_CATEGORIES.includes(p.category) && !p.exerciseId) {
-    return setEmpty('Pick an exercise');
-  }
-  let entries;
-  try {
-    entries = await loadEntries();
-  } catch (err) {
-    return showQueryError(err);
-  }
-  if (!entries.length) return setEmpty('No data yet');
-
-  if (p.category === 'boulder' || p.category === 'rope_redpoint') return drawClimbChart(entries);
-  if (p.category === 'rope_endurance') return drawLapsChart(entries);
-  if (p.category === 'finger') return drawFingerChart(entries);
-  if (p.category === 'cardio') return drawCardioChart(entries);
-  if (p.category === 'rehab') return drawRehabChart(entries);
-  return drawSCChart(entries);
-}
-
-const baseOptions = (yTitle, extra = {}) => ({
-  responsive: true, maintainAspectRatio: false,
-  scales: {
-    x: { type: 'category', grid: { color: C.border }, ticks: { color: C.muted, maxRotation: 45, font: { size: 10 } } },
-    y: { title: { display: true, text: yTitle, color: C.muted, font: { size: 11 } },
-         grid: { color: C.border }, ticks: { color: C.muted, font: { size: 10 } } },
-    ...(extra.scales || {})
-  },
-  plugins: {
-    legend: { display: extra.legend !== false, labels: { color: C.muted, boxWidth: 12, font: { size: 11 } } },
-    tooltip: extra.tooltip || {}
-  }
-});
-
-// Points on the per-session charts are the best set of that day; `meta` carries
-// that set's details so hovering shows what actually produced the number.
-function detailTooltip(meta) {
-  return {
-    callbacks: {
-      afterBody: items => {
-        const d = meta[items[0].dataIndex];
-        return d ? d.lines : [];
-      }
-    }
-  };
-}
-
 function statGrid(stats) {
   document.getElementById('prog-stats').innerHTML = `
     <div class="stat-grid">
@@ -228,197 +203,212 @@ function statGrid(stats) {
     </div>`;
 }
 
-// ── Strength & Conditioning ──────────────────────────────────
-// Epley: the estimate that makes a heavy triple and a lighter set of eight
-// comparable. Rounded, matching how it's normally written down.
-const epley = (weight, reps) =>
-  weight == null || reps == null ? null : Math.round(weight * (1 + reps / 30));
+const AXIS_IDS = ['y', 'y1', 'y2'];
 
+// dates: string[]; byDate: Map<date, {values:{key:num}, lines:string[]}>
+function drawOverlay(dates, byDate, series, note) {
+  const ctx = resetCanvas();
+  const scales = {
+    x: { type: 'category', grid: { color: C.border },
+         ticks: { color: C.muted, maxRotation: 45, font: { size: 10 }, autoSkipPadding: 12 } }
+  };
+  series.forEach((s, i) => {
+    const id = AXIS_IDS[i] || `y${i}`;
+    scales[id] = {
+      position: i === 1 ? 'right' : 'left',
+      display: i < 2,
+      grid: { color: i === 0 ? C.border : 'transparent', drawOnChartArea: i === 0 },
+      ticks: { color: s.color, font: { size: 10 } },
+      title: { display: i < 2, text: s.label, color: s.color, font: { size: 10 } }
+    };
+  });
+
+  chart = safeChart(ctx, {
+    type: 'line',
+    data: {
+      labels: dates.map(fmtDate),
+      datasets: series.map((s, i) => ({
+        label: s.label,
+        data: dates.map(d => byDate.get(d).values[s.key] ?? null),
+        borderColor: s.color, backgroundColor: s.color,
+        yAxisID: AXIS_IDS[i] || `y${i}`,
+        tension: .25, pointRadius: 3, borderWidth: 2, spanGaps: true
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales,
+      plugins: {
+        legend: { labels: { color: C.muted, boxWidth: 12, font: { size: 11 }, usePointStyle: true } },
+        tooltip: {
+          callbacks: {
+            afterBody: items => byDate.get(dates[items[0].dataIndex])?.lines || []
+          }
+        }
+      }
+    }
+  });
+  document.getElementById('prog-legend').innerHTML = note || '';
+}
+
+// ── Strength & Conditioning ──────────────────────────────────
 function drawSCChart(entries) {
-  const metric = S.progress.metric || 'load';
   const byDate = new Map();
   entries.forEach(e => {
     const sets = (e.sets || []).filter(s => s.reps != null || s.weight != null);
     if (!sets.length) return;
-    const cur = byDate.get(e.date) || { maxLoad: 0, reps: 0, work: 0, e1rm: 0 };
+    const cur = byDate.get(e.date) || { values: { load: 0, reps: 0, work: 0 }, lines: [] };
     sets.forEach(s => {
       const w = s.weight || 0, r = s.reps || 0;
-      cur.maxLoad = Math.max(cur.maxLoad, w);
-      cur.reps += r;
-      cur.work += w * r;
-      cur.e1rm = Math.max(cur.e1rm, epley(w, r) || 0);
+      cur.values.load = Math.max(cur.values.load, w);
+      cur.values.reps += r;
+      cur.values.work += w * r;
     });
+    cur.lines = sets.map((s, i) =>
+      `${i + 1}. ${s.weightType === 'relative' ? `BW${s.weight > 0 ? '+' : ''}${s.weight || 0}` : s.weight}`
+      + ` × ${s.reps ?? '–'}${s.rpe ? ` @ RPE ${s.rpe}` : ''}`);
     byDate.set(e.date, cur);
   });
   const dates = [...byDate.keys()].sort();
-  const pick = d => {
-    const v = byDate.get(d);
-    return { load: v.maxLoad, reps: v.reps, work: v.work, e1rm: v.e1rm }[metric];
-  };
-  const data = dates.map(pick);
+  if (!dates.length) return setEmpty('No data yet');
 
-  const ctx = resetCanvas();
-  chart = safeChart(ctx, {
-    type: 'line',
-    data: { labels: dates.map(fmtDate), datasets: [{
-      label: METRICS.sc[metric], data, borderColor: C.blue,
-      backgroundColor: C.blue, tension: .25, pointRadius: 4
-    }] },
-    options: baseOptions(METRICS.sc[metric], { legend: false })
-  });
-
-  const last = data[data.length - 1];
+  drawOverlay(dates, byDate, SERIES.sc,
+    'Load = heaviest set · Reps = total reps · Total work = Σ(load × reps). Tap a legend key to hide a line.');
   statGrid([
     ['Sessions', dates.length],
-    ['Best', Math.max(...data).toLocaleString()],
-    ['Latest', last?.toLocaleString() ?? '–']
+    ['Best load', Math.max(...dates.map(d => byDate.get(d).values.load))],
+    ['Latest load', byDate.get(dates[dates.length - 1]).values.load]
   ]);
-  document.getElementById('prog-legend').innerHTML =
-    'Load = heaviest set · Reps = total reps · Total Work = Σ(load × reps) · '
-    + 'Est 1RM = best set by Epley, load × (1 + reps/30). '
-    + 'For BW± sets the load is the weight added (negative = assisted).';
-}
-
-// ── Cardio ───────────────────────────────────────────────────
-function drawCardioChart(entries) {
-  const metric = S.progress.metric || 'distance';
-  const rows = entries
-    .filter(e => e.cardioClass === 'endurance' && e.endurance)
-    .map(e => ({ date: e.date, d: e.endurance.distance, t: e.endurance.timeSec, u: e.endurance.distanceUnit }));
-  if (!rows.length) return setEmpty('No endurance cardio logged for this exercise');
-
-  const value = r => metric === 'distance' ? r.d
-    : metric === 'time' ? (r.t ? r.t / 60 : null)
-    : (r.d && r.t ? (r.t / 60) / r.d : null);
-  const yTitle = metric === 'distance' ? `Distance (${rows[0].u || ''})`
-    : metric === 'time' ? 'Time (min)' : `Pace (min/${rows[0].u || 'mi'})`;
-
-  const ctx = resetCanvas();
-  chart = safeChart(ctx, {
-    type: 'line',
-    data: { labels: rows.map(r => fmtDate(r.date)), datasets: [{
-      label: yTitle, data: rows.map(value), borderColor: C.pink,
-      backgroundColor: C.pink, tension: .25, pointRadius: 4
-    }] },
-    options: baseOptions(yTitle, {
-      legend: false,
-      scales: metric === 'pace' ? { y: { reverse: true, grid: { color: C.border }, ticks: { color: C.muted } } } : {}
-    })
-  });
-  statGrid([
-    ['Sessions', rows.length],
-    ['Total dist', rows.reduce((a, r) => a + (r.d || 0), 0).toFixed(1)],
-    ['Total time', fmtSecAsMMSS(rows.reduce((a, r) => a + (r.t || 0), 0))]
-  ]);
-  document.getElementById('prog-legend').innerHTML = metric === 'pace' ? 'Lower is faster (axis inverted)' : '';
-}
-
-// ── Finger training (one chart per protocol) ─────────────────
-function drawFingerChart(entries) {
-  const p = S.progress;
-  const metric = p.metric || 'load';
-  const rows = [];
-
-  const setLines = (s, extra) => [
-    `grip: ${s.grip}`,
-    s.implement ? `implement: ${s.implement}` : null,
-    `apparatus: ${APPARATUS[s.apparatus] || s.apparatus}`,
-    ...extra
-  ].filter(Boolean);
-
-  entries.filter(e => e.protocol === p.protocol).forEach(e => {
-    (e.sets || []).forEach(s => {
-      if (p.grip && s.grip !== p.grip) return;
-      if (p.protocol === 'max_hang' || p.protocol === 'density_hang') {
-        (s.reps || []).forEach(r => rows.push({
-          date: e.date, load: r.load, duration: r.durationSec,
-          lines: setLines(s, [`${r.load ?? '–'}lb × ${r.durationSec ?? '–'}s`,
-            r.rpe ? `RPE ${r.rpe}` : null])
-        }));
-      } else if (p.protocol === 'repeaters') {
-        rows.push({ date: e.date, load: s.load, reps: s.reps,
-          lines: setLines(s, [`${s.load ?? '–'}lb, ${s.workSec ?? '–'}:${s.restSec ?? '–'} × ${s.reps ?? '–'}`]) });
-      } else {
-        rows.push({ date: e.date, load: s.load, reps: s.reps, work: (s.load || 0) * (s.reps || 0),
-          lines: setLines(s, [`${s.load ?? '–'}lb × ${s.reps ?? '–'}`, s.rpe ? `RPE ${s.rpe}` : null]) });
-      }
-    });
-  });
-  if (!rows.length) return setEmpty('No data for this protocol/grip yet');
-
-  // Best set per session date, keeping that set's details for the tooltip.
-  const byDate = new Map();
-  rows.forEach(r => {
-    const v = r[metric];
-    if (v == null) return;
-    const cur = byDate.get(r.date);
-    if (!cur || v > cur.value) byDate.set(r.date, { value: v, lines: r.lines });
-  });
-  const dates = [...byDate.keys()].sort();
-  if (!dates.length) return setEmpty('No data for this metric yet');
-  const data = dates.map(d => byDate.get(d).value);
-  const meta = dates.map(d => byDate.get(d));
-  const yTitle = METRICS[p.protocol][metric] + (metric === 'duration' ? ' (s)' : metric === 'load' ? ' (lb)' : '');
-
-  const ctx = resetCanvas();
-  chart = safeChart(ctx, {
-    type: 'line',
-    data: { labels: dates.map(fmtDate), datasets: [{
-      label: yTitle, data, borderColor: C.green, backgroundColor: C.green, tension: .25, pointRadius: 4
-    }] },
-    options: baseOptions(yTitle, { legend: false, tooltip: detailTooltip(meta) })
-  });
-  statGrid([
-    ['Sessions', dates.length],
-    ['Best', Math.max(...data)],
-    ['Latest', data[data.length - 1]]
-  ]);
-  document.getElementById('prog-legend').innerHTML =
-    `${FINGER_PROTOCOLS[p.protocol]}${p.grip ? ` · ${esc(p.grip)}` : ' · all grips'} — best set per session; hover for its details`;
 }
 
 // ── Rehab ────────────────────────────────────────────────────
 function drawRehabChart(entries) {
-  const metric = S.progress.metric || 'load';
-  const pick = s => ({ load: s.load, duration: s.durationSec, reps: s.reps }[metric]);
-
   const byDate = new Map();
   entries.forEach(e => (e.sets || []).forEach(s => {
-    const v = pick(s);
-    if (v == null) return;
-    const cur = byDate.get(e.date);
-    if (cur && v <= cur.value) return;
-    byDate.set(e.date, { value: v, lines: [
-      [s.load != null ? `${s.load}lb` : null, s.reps != null ? `× ${s.reps}` : null,
-       s.durationSec != null ? `${s.durationSec}s` : null].filter(Boolean).join(' '),
-      s.rpe ? `RPE ${s.rpe}` : null
-    ].filter(Boolean) });
+    const cur = byDate.get(e.date) || { values: { load: 0, duration: 0, reps: 0 }, lines: [] };
+    cur.values.load = Math.max(cur.values.load, s.load || 0);
+    cur.values.duration = Math.max(cur.values.duration, s.durationSec || 0);
+    cur.values.reps = Math.max(cur.values.reps, s.reps || 0);
+    byDate.set(e.date, cur);
   }));
-
-  const dates = [...byDate.keys()].sort();
-  if (!dates.length) return setEmpty('No data for this metric yet');
-  const data = dates.map(d => byDate.get(d).value);
-  const meta = dates.map(d => byDate.get(d));
-  const yTitle = METRICS.rehab[metric] + (metric === 'duration' ? ' (s)' : metric === 'load' ? ' (lb)' : '');
-
-  const ctx = resetCanvas();
-  chart = safeChart(ctx, {
-    type: 'line',
-    data: { labels: dates.map(fmtDate), datasets: [{
-      label: yTitle, data, borderColor: C.purple, backgroundColor: C.purple, tension: .25, pointRadius: 4
-    }] },
-    options: baseOptions(yTitle, { legend: false, tooltip: detailTooltip(meta) })
+  entries.forEach(e => {
+    const cur = byDate.get(e.date);
+    if (cur) cur.lines = (e.sets || []).map((s, i) =>
+      `${i + 1}. ${[s.load != null ? `${s.load}lb` : null, s.reps != null ? `× ${s.reps}` : null,
+        s.durationSec != null ? `${s.durationSec}s` : null].filter(Boolean).join(' ')}`);
   });
+  const dates = [...byDate.keys()].sort();
+  if (!dates.length) return setEmpty('No data yet');
+
+  drawOverlay(dates, byDate, SERIES.rehab, 'Best set of each session.');
   statGrid([
     ['Sessions', dates.length],
-    ['Best', Math.max(...data)],
-    ['Latest', data[data.length - 1]]
+    ['Best load', Math.max(...dates.map(d => byDate.get(d).values.load))],
+    ['Latest load', byDate.get(dates[dates.length - 1]).values.load]
   ]);
-  document.getElementById('prog-legend').innerHTML = 'Best set per session — hover for its details';
+}
+
+// ── Cardio ───────────────────────────────────────────────────
+function drawCardioChart(entries) {
+  const byDate = new Map();
+  entries.filter(e => e.cardioClass === 'endurance' && e.endurance).forEach(e => {
+    const d = e.endurance;
+    const min = d.timeSec ? d.timeSec / 60 : null;
+    byDate.set(e.date, {
+      values: {
+        distance: d.distance ?? null,
+        time: min,
+        pace: d.distance && min ? +(min / d.distance).toFixed(2) : null
+      },
+      lines: [`${d.distance ?? '–'} ${d.distanceUnit || ''} in ${fmtSecAsMMSS(d.timeSec)}`]
+    });
+  });
+  const dates = [...byDate.keys()].sort();
+  if (!dates.length) return setEmpty('No endurance cardio logged for this exercise');
+
+  drawOverlay(dates, byDate, SERIES.cardio, 'Pace is derived from distance and time — lower is faster.');
+  statGrid([
+    ['Sessions', dates.length],
+    ['Total dist', dates.reduce((a, d) => a + (byDate.get(d).values.distance || 0), 0).toFixed(1)],
+    ['Total time', fmtSecAsMMSS(dates.reduce((a, d) => a + (byDate.get(d).values.time || 0) * 60, 0))]
+  ]);
+}
+
+// ── Finger training — one grip at a time, load and duration together ──
+function drawFingerChart(entries) {
+  const p = S.progress;
+  const forProtocol = entries.filter(e => e.protocol === p.protocol);
+
+  const grips = [...new Set(forProtocol.flatMap(e => (e.sets || []).map(s => s.grip)).filter(Boolean))].sort();
+  const gripsEl = document.getElementById('prog-grips');
+  if (!grips.length) {
+    if (gripsEl) gripsEl.innerHTML = '';
+    return setEmpty('No data for this protocol yet');
+  }
+  if (!p.grip || !grips.includes(p.grip)) p.grip = grips[0];
+
+  if (gripsEl) {
+    gripsEl.innerHTML = `
+      <div class="section-label" style="margin:10px 0 6px">Grip</div>
+      <div class="pill-row" style="margin-bottom:0">
+        ${grips.map(g => `<span class="pill${p.grip === g ? ' active' : ''}" data-prog-grip="${esc(g)}">${esc(g)}</span>`).join('')}
+      </div>`;
+    gripsEl.querySelectorAll('[data-prog-grip]').forEach(n => n.onclick = () => {
+      p.grip = n.dataset.progGrip;
+      refresh();
+    });
+  }
+
+  const byDate = new Map();
+  forProtocol.forEach(e => {
+    const sets = (e.sets || []).filter(s => s.grip === p.grip);
+    if (!sets.length) return;
+    const cur = byDate.get(e.date) || { values: { load: 0, duration: 0, reps: 0 }, lines: [] };
+    const lines = [];
+    sets.forEach(s => {
+      const detail = [s.implement, APPARATUS[s.apparatus] || s.apparatus].filter(Boolean).join(' · ');
+      if (p.protocol === 'max_hang' || p.protocol === 'density_hang') {
+        (s.reps || []).forEach(r => {
+          cur.values.load = Math.max(cur.values.load, r.load || 0);
+          cur.values.duration = Math.max(cur.values.duration, r.durationSec || 0);
+          lines.push(`${r.load ?? '–'}lb × ${r.durationSec ?? '–'}s${r.rpe ? ` @ RPE ${r.rpe}` : ''}`);
+        });
+      } else {
+        cur.values.load = Math.max(cur.values.load, s.load || 0);
+        cur.values.reps = Math.max(cur.values.reps, s.reps || 0);
+        lines.push(`${s.load ?? '–'}lb × ${s.reps ?? '–'}`);
+      }
+      if (detail) lines.push(detail);
+    });
+    cur.lines = lines;
+    byDate.set(e.date, cur);
+  });
+
+  const dates = [...byDate.keys()].sort();
+  if (!dates.length) return setEmpty(`No ${p.grip} data for this protocol yet`);
+
+  drawOverlay(dates, byDate, SERIES[p.protocol],
+    `${FINGER_PROTOCOLS[p.protocol]} · ${esc(p.grip)} — best set of each session.`);
+  statGrid([
+    ['Sessions', dates.length],
+    ['Best load', Math.max(...dates.map(d => byDate.get(d).values.load))],
+    ['Latest load', byDate.get(dates[dates.length - 1]).values.load]
+  ]);
 }
 
 // ── Bouldering / Rope Redpoint ───────────────────────────────
 const attemptColor = n => n <= 1 ? C.green : n <= 3 ? C.amber : C.red;
+
+function gradeScaleOptions(scale, pts) {
+  return {
+    min: Math.max(0, Math.min(...pts.map(p => p.y)) - 1),
+    max: Math.min(scale.length - 1, Math.max(...pts.map(p => p.y)) + 1),
+    ticks: { color: C.muted, stepSize: 1, callback: v => scale[v] || '', font: { size: 10 } },
+    grid: { color: C.border },
+    title: { display: true, text: 'Grade', color: C.muted, font: { size: 11 } }
+  };
+}
 
 function drawClimbChart(entries) {
   const scale = gradeScale(S.progress.category);
@@ -432,53 +422,47 @@ function drawClimbChart(entries) {
 
   const sent = pts.filter(p => p.outcome === 'send' || p.outcome === 'flash');
   const tried = pts.filter(p => p.outcome === 'attempt');
-  const labels = [...new Set(pts.map(p => p.x))];
 
   const ctx = resetCanvas();
   chart = safeChart(ctx, {
     type: 'scatter',
     data: {
-      labels,
+      labels: [...new Set(pts.map(p => p.x))],
       datasets: [
-        { label: 'Sent', data: sent, pointRadius: 6, pointStyle: 'circle',
+        { label: 'Sent', data: sent, pointRadius: 6,
           pointBackgroundColor: sent.map(p => attemptColor(p.attempts)),
           pointBorderColor: sent.map(p => attemptColor(p.attempts)) },
-        { label: 'Attempted', data: tried, pointRadius: 6, pointStyle: 'circle',
+        { label: 'Attempted', data: tried, pointRadius: 6,
           pointBackgroundColor: 'transparent', borderWidth: 2,
           pointBorderColor: tried.map(p => attemptColor(p.attempts)) }
       ]
     },
-    options: baseOptions('Grade', {
+    options: {
+      responsive: true, maintainAspectRatio: false,
       scales: {
-        y: {
-          min: Math.max(0, Math.min(...pts.map(p => p.y)) - 1),
-          max: Math.min(scale.length - 1, Math.max(...pts.map(p => p.y)) + 1),
-          ticks: { color: C.muted, stepSize: 1, callback: v => scale[v] || '', font: { size: 10 } },
-          grid: { color: C.border },
-          title: { display: true, text: 'Grade', color: C.muted, font: { size: 11 } }
-        }
+        x: { type: 'category', grid: { color: C.border },
+             ticks: { color: C.muted, maxRotation: 45, font: { size: 10 }, autoSkipPadding: 12 } },
+        y: gradeScaleOptions(scale, pts)
       },
-      tooltip: {
-        callbacks: {
-          label: ctx => {
-            const p = ctx.raw;
-            return [`${p.grade}${p.name ? ` — ${p.name}` : ''}`,
-              `${p.outcome} · ${p.attempts} attempt${p.attempts === 1 ? '' : 's'}`];
-          }
-        }
+      plugins: {
+        legend: { labels: { color: C.muted, boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => {
+          const p = ctx.raw;
+          return [`${p.grade}${p.name ? ` — ${p.name}` : ''}`,
+            `${p.outcome} · ${p.attempts} attempt${p.attempts === 1 ? '' : 's'}`];
+        } } }
       }
-    })
+    }
   });
 
-  const hardestSent = sent.length ? scale[Math.max(...sent.map(p => p.y))] : '–';
   statGrid([
     ['Climbs', pts.length],
     ['Sent', sent.length],
-    ['Hardest sent', hardestSent]
+    ['Hardest sent', sent.length ? scale[Math.max(...sent.map(p => p.y))] : '–']
   ]);
   document.getElementById('prog-legend').innerHTML =
-    'Solid = sent · Hollow = attempted &nbsp;|&nbsp; ' +
-    `<span style="color:${C.green}">1 try</span> · <span style="color:${C.amber}">2–3</span> · <span style="color:${C.red}">4+</span>`;
+    'Solid = sent · Hollow = attempted &nbsp;|&nbsp; '
+    + `<span style="color:${C.green}">1 try</span> · <span style="color:${C.amber}">2–3</span> · <span style="color:${C.red}">4+</span>`;
 }
 
 // ── Rope Endurance Laps ──────────────────────────────────────
@@ -500,36 +484,28 @@ function drawLapsChart(entries) {
       datasets: [{ label: 'Lap set', data: pts, pointRadius: 6,
         pointBackgroundColor: C.green, pointBorderColor: C.green }]
     },
-    options: baseOptions('Grade', {
-      legend: false,
+    options: {
+      responsive: true, maintainAspectRatio: false,
       scales: {
-        y: {
-          min: Math.max(0, Math.min(...pts.map(p => p.y)) - 1),
-          max: Math.min(scale.length - 1, Math.max(...pts.map(p => p.y)) + 1),
-          ticks: { color: C.muted, stepSize: 1, callback: v => scale[v] || '', font: { size: 10 } },
-          grid: { color: C.border },
-          title: { display: true, text: 'Grade', color: C.muted, font: { size: 11 } }
-        }
+        x: { type: 'category', grid: { color: C.border },
+             ticks: { color: C.muted, maxRotation: 45, font: { size: 10 }, autoSkipPadding: 12 } },
+        y: gradeScaleOptions(scale, pts)
       },
-      tooltip: {
-        callbacks: {
-          label: ctx => {
-            const p = ctx.raw;
-            return [`${p.grade}`, `${p.laps ?? '–'} laps`,
-              p.timeSec ? `${fmtSecAsMMSS(p.timeSec)} on the wall` : '',
-              p.rpe ? `RPE ${p.rpe}` : ''].filter(Boolean);
-          }
-        }
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => {
+          const p = ctx.raw;
+          return [`${p.grade}`, `${p.laps ?? '–'} laps`,
+            p.timeSec ? `${fmtSecAsMMSS(p.timeSec)} on the wall` : '',
+            p.rpe ? `RPE ${p.rpe}` : ''].filter(Boolean);
+        } } }
       }
-    })
+    }
   });
 
-  statGrid([
-    ['Lap sets', pts.length],
-    ['Total laps', pts.reduce((a, p) => a + (p.laps || 0), 0)],
-    ['Time on wall', fmtSecAsMMSS(pts.reduce((a, p) => a + (p.timeSec || 0), 0))]
-  ]);
-  document.getElementById('prog-legend').innerHTML = 'One point per lap set — hover for laps and time on the wall';
+  document.getElementById('prog-stats').innerHTML = '';
+  document.getElementById('prog-legend').innerHTML =
+    'One point per lap set — tap for laps, time and RPE.';
 }
 
 export function invalidateProgressCache() { cache = { key: null, entries: [] }; }

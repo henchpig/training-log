@@ -263,14 +263,7 @@ await step('S&C chart renders for Bench Press', async () => {
   // sets: BW-20, 145, 155 → heaviest load 155
   if (!stats.includes('155')) throw new Error('expected best load 155, got: ' + stats.replace(/\n/g, ' '));
 });
-await step('Est 1RM uses Epley (155 x 5 -> 181)', async () => {
-  await page.locator('#tab-progress .pill', { hasText: 'Est 1RM' }).click();
-  await page.waitForTimeout(400);
-  const data = await page.evaluate(() => window.__CHARTS[window.__CHARTS.length - 1].data.datasets[0].data);
-  if (data[0] !== 181) throw new Error('expected 181, got ' + data.join(','));
-  await page.locator('#tab-progress .pill', { hasText: 'Load' }).first().click();
-  await page.waitForTimeout(300);
-});
+
 await step('relative (BW±) weight type round-trips', async () => {
   const sc = await page.evaluate(() => window.__DB.entries.find(e => e.category === 'sc'));
   if (sc.sets[0].weightType !== 'relative' || sc.sets[0].weight !== -20) {
@@ -289,17 +282,17 @@ await step('history shows BW-20 for the relative set', async () => {
   await page.locator('#tab-progress .chip', { hasText: 'Bench Press' }).click();
   await page.waitForTimeout(400);
 });
-await step('S&C metric toggles work, incl. Est 1RM', async () => {
-  for (const m of ['Reps', 'Total Work', 'Est 1RM']) {
-    await page.locator('#tab-progress .pill', { hasText: m }).first().click();
-    await page.waitForTimeout(300);
-  }
+await step('S&C metrics are overlaid, not tabbed', async () => {
+  const cfg = await page.evaluate(() => window.__CHARTS[window.__CHARTS.length - 1]);
+  if (cfg.data.datasets.length !== 3) throw new Error('expected 3 series overlaid');
 });
-await step('finger chart splits by protocol', async () => {
+await step('finger chart splits by protocol, with grip tabs', async () => {
   await page.locator('#tab-progress .pill', { hasText: 'Finger Training' }).click();
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(500);
   const protos = await page.locator('#tab-progress [data-prog-proto]').count();
   if (protos !== 4) throw new Error('expected 4 protocol pills, got ' + protos);
+  const grips = await page.locator('#prog-grips .pill').count();
+  if (grips !== 1) throw new Error('expected 1 grip tab for the logged data, got ' + grips);
   const legend = await page.locator('#prog-legend').innerText();
   if (!legend.includes('Max Hang')) throw new Error('legend: ' + legend);
 });
@@ -317,11 +310,13 @@ await step('boulder scatter renders with grade axis', async () => {
   const legend = await page.locator('#prog-legend').innerText();
   if (!legend.toLowerCase().includes('solid')) throw new Error('legend missing solid/hollow key');
 });
-await step('endurance laps chart renders', async () => {
+await step('endurance laps chart renders with no stat overview', async () => {
   await page.locator('#tab-progress .pill', { hasText: 'Rope Endurance Laps' }).click();
   await page.waitForTimeout(500);
   const stats = await page.locator('#prog-stats').innerText();
-  if (!stats.includes('4')) throw new Error('expected 4 total laps, got: ' + stats.replace(/\n/g, ' '));
+  if (stats.trim()) throw new Error('overview should be gone, got: ' + stats.replace(/\n/g, ' '));
+  const cfg = await page.evaluate(() => window.__CHARTS[window.__CHARTS.length - 1]);
+  if (cfg.data.datasets[0].data.length !== 1) throw new Error('expected 1 lap point');
 });
 
 await step('boulder chart config: solid sent vs hollow attempted', async () => {
@@ -344,17 +339,19 @@ await step('laps chart config: one point per set w/ laps+time in point', async (
   }
 });
 
-await step('rehab chart renders with its own metrics', async () => {
+await step('rehab overlays load / duration / reps', async () => {
   await page.locator('#tab-progress .pill', { hasText: 'Rehab' }).click();
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(400);
   await page.locator('#tab-progress .chip', { hasText: 'Iso Wrist Extension' }).click();
-  await page.waitForTimeout(500);
-  const metrics = await page.locator('#tab-progress [data-prog-metric]').allInnerTexts();
-  if (!metrics.includes('Duration')) throw new Error('rehab should offer a Duration metric, got ' + metrics.join(','));
+  await page.waitForTimeout(600);
+  const labels = await page.evaluate(() =>
+    window.__CHARTS[window.__CHARTS.length - 1].data.datasets.map(d => d.label));
+  if (!labels.some(l => /Duration/.test(l))) throw new Error('no duration series: ' + labels.join(','));
+  if (labels.length !== 3) throw new Error('expected 3 series, got ' + labels.join(','));
   const stats = await page.locator('#prog-stats').innerText();
   if (!stats.includes('30')) throw new Error('expected best load 30, got: ' + stats.replace(/\n/g, ' '));
 });
-await step('finger tooltip carries grip / implement / apparatus', async () => {
+await step('finger tooltip carries implement + apparatus (grip is the tab)', async () => {
   await page.locator('#tab-progress .pill', { hasText: 'Finger Training' }).click();
   await page.waitForTimeout(500);
   const cfg = await page.evaluate(() => {
@@ -363,7 +360,7 @@ await step('finger tooltip carries grip / implement / apparatus', async () => {
     return cb([{ dataIndex: 0 }]);
   });
   const joined = cfg.join(' | ');
-  for (const want of ['half crimp', 'unlevel edge', 'Hangboard']) {
+  for (const want of ['unlevel edge', 'Hangboard']) {
     if (!joined.includes(want)) throw new Error(`tooltip missing "${want}": ${joined}`);
   }
 });
@@ -371,7 +368,7 @@ await step('finger tooltip carries grip / implement / apparatus', async () => {
 await step('missing-index error surfaces a create link, not a crash', async () => {
   await page.evaluate(() => { window.__FAIL_INDEX = true; });
   await page.locator('#tab-progress .pill', { hasText: 'Bouldering' }).click();
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(700);
   const txt = await page.locator('#tab-progress').innerText();
   if (!txt.includes('needs a Firestore index')) throw new Error('no index message: ' + txt.slice(0, 200));
   const href = await page.locator('#tab-progress .chart-wrap a').getAttribute('href');

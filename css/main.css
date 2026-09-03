@@ -26,12 +26,13 @@ nav button.active{color:var(--text);border-bottom-color:var(--green)}
 .field.wide{flex:2 1 140px}
 .field.full{flex:1 1 100%}
 label,.lbl{font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.5px}
-input,select,textarea{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--sans);font-size:14px;padding:8px 10px;width:100%;outline:none;-webkit-appearance:none;appearance:none}
+/* 16px keeps iOS from zooming the viewport when a field takes focus. */
+input,select,textarea{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--sans);font-size:16px;padding:10px;width:100%;min-height:44px;outline:none;-webkit-appearance:none;appearance:none}
 input:focus,select:focus,textarea:focus{border-color:var(--border2)}
 select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
 input[type=number]{-moz-appearance:textfield}
 input[type=number]::-webkit-inner-spin-button{display:none}
-textarea{resize:vertical;min-height:52px;font-size:13px}
+textarea{resize:vertical;min-height:64px;font-size:16px}
 input::placeholder,textarea::placeholder{color:var(--dim)}
 .ac-wrap{position:relative}
 .ac-list{position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--surface2);border:1px solid var(--border2);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:160px;overflow-y:auto;display:none}
@@ -39,13 +40,13 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
 .ac-item{padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
 .ac-item:last-child{border-bottom:none}
 .ac-item:hover{background:var(--surface3)}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:var(--sans);font-size:13px;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 16px;min-height:44px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:var(--sans);font-size:13px;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .btn:hover{border-color:var(--border2);background:var(--surface3)}
 .btn:active{opacity:.8}
 .btn-primary{background:var(--green);color:#000;border-color:var(--green);font-weight:500}
 .btn-primary:hover{opacity:.88;background:var(--green)}
-.btn-sm{padding:6px 12px;font-size:12px}
-.btn-danger{color:var(--red);border-color:transparent;background:none;padding:6px 8px;font-size:12px;cursor:pointer;font-family:var(--sans)}
+.btn-sm{padding:8px 12px;font-size:13px;min-height:36px}
+.btn-danger{color:var(--red);border-color:transparent;background:none;padding:8px 10px;min-width:38px;min-height:38px;font-size:14px;cursor:pointer;font-family:var(--sans)}
 .btn-danger:hover{background:rgba(252,92,101,.1)}
 .btn-block{width:100%;padding:12px}
 .btn-group{display:flex;gap:8px;flex-wrap:wrap}
@@ -66,15 +67,24 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
 .entry-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--surface2)}
 .entry-name{font-weight:500;font-size:14px}
 .entry-body{padding:12px}
-.set-row{display:flex;gap:6px;align-items:center;padding:6px 8px;background:var(--surface2);border-radius:var(--radius);margin-bottom:4px;flex-wrap:wrap}
+.set-row{display:flex;gap:6px;align-items:center;padding:8px;background:var(--surface2);border-radius:var(--radius);margin-bottom:6px;flex-wrap:wrap}
 .set-row .set-num{font-family:var(--mono);font-size:11px;color:var(--muted);min-width:20px}
-.set-row input,.set-row select{flex:1 1 60px;min-width:50px}
+.set-row input,.set-row select{flex:1 1 60px;min-width:64px;padding:9px 8px;min-height:42px}
 .chip-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;max-height:180px;overflow-y:auto}
-.chip{padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;cursor:pointer;white-space:nowrap;font-family:var(--sans)}
+.chip{display:inline-flex;align-items:center;padding:0 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;cursor:pointer;white-space:nowrap;font-family:var(--sans);min-height:40px}
 .chip:hover{background:var(--surface3);border-color:var(--border2)}
 .chip.active-chip{background:var(--green);color:#000;border-color:var(--green)}
-.mp-chip{padding:5px 10px;border-radius:16px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:12px;cursor:pointer;user-select:none}
+.mp-chip{display:inline-flex;align-items:center;min-height:38px;padding:0 13px;border-radius:19px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:13px;cursor:pointer;user-select:none}
 .mp-chip.selected{background:rgba(78,205,196,.15);border-color:var(--green);color:var(--green)}
+/* Separates the category row from whatever it drills into. */
+.sub-picker{margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.chart-note{margin-top:10px;font-size:11px;color:var(--muted);line-height:1.5}
+/* Column names for a set list — placeholders disappear once a box is filled. */
+.set-head{display:flex;gap:6px;align-items:center;padding:0 8px 4px;font-size:10px;
+  color:var(--dim);text-transform:uppercase;letter-spacing:.4px}
+.set-head span{flex:1 1 60px;min-width:50px}
+.set-head .set-num,.set-head .spacer{flex:0 0 20px;min-width:20px}
+.set-head .spacer-btn{flex:0 0 38px;min-width:38px}
 .section-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:500}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px 18px;font-size:13px;opacity:0;transition:all .25s;pointer-events:none;z-index:999;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -86,7 +96,7 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
 @keyframes spin{to{transform:rotate(360deg)}}
 .filter-bar{display:flex;gap:8px;margin-bottom:12px}
 .filter-bar input,.filter-bar select{flex:1;min-width:0}
-.pill{padding:4px 10px;border-radius:12px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:12px;cursor:pointer}
+.pill{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:13px;cursor:pointer;user-select:none}
 .pill.active{border-color:var(--green);color:var(--green);background:rgba(78,205,196,.08)}
 .pill-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .session-row{display:flex;align-items:flex-start;padding:12px 14px;cursor:pointer;border-bottom:1px solid var(--border);gap:12px}
@@ -105,9 +115,42 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
 .stat-lbl{font-size:10px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
 .edit-banner{background:rgba(247,183,49,.08);border:1px solid var(--amber);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:var(--amber)}
 .draft-banner{background:rgba(78,205,196,.08);border:1px solid var(--green);border-radius:var(--radius);padding:8px 14px;margin-bottom:10px;font-size:12px;color:var(--green);display:flex;justify-content:space-between;align-items:center}
-@media(max-width:600px){
+nav button{min-height:44px}
+.save-bar{display:flex;gap:8px;margin-top:12px}
+
+@media(max-width:700px){
+  .app{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
   .topbar{padding:10px 12px 0}
-  nav button{padding:8px 9px;font-size:12px}
   .content{padding:12px}
-  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .stat-grid{grid-template-columns:repeat(3,1fr);gap:6px}
+  .stat{padding:10px 6px}
+  .stat-val{font-size:17px}
+  .chart-wrap{height:230px}
+  .card{padding:12px}
+
+  /* Tab bar to the bottom edge: reachable one-handed while holding a phone. */
+  .topbar{position:static;border-bottom:none;padding-bottom:0}
+  .topbar-inner{padding-bottom:10px}
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--surface);
+      border-top:1px solid var(--border);justify-content:space-around;
+      padding-bottom:env(safe-area-inset-bottom)}
+  nav button{flex:1;border-bottom:none;border-top:2px solid transparent;
+             padding:12px 4px;font-size:12px}
+  nav button.active{border-top-color:var(--green);border-bottom-color:transparent}
+
+  /* Keep Save reachable without scrolling to the end of a long session. The
+     border reads as a floating bar rather than content that got out of order. */
+  .save-bar{position:sticky;bottom:calc(60px + env(safe-area-inset-bottom));
+            background:var(--bg);padding:10px 0;z-index:40;
+            border-top:1px solid var(--border);
+            box-shadow:0 -8px 12px -6px rgba(0,0,0,.7)}
+
+  .set-row input,.set-row select{min-width:70px}
+  .entry-body{padding:10px}
+  .field-row{gap:6px}
+}
+
+@media(max-width:380px){
+  .set-row input,.set-row select{min-width:58px}
+  nav button{font-size:11px;padding:12px 2px}
 }
