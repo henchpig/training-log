@@ -82,7 +82,8 @@ npm test
 Drives the real UI in headless Chromium with the Firebase boundary (`auth.js`,
 `db.js`) and the Chart.js CDN swapped for in-memory stubs — so it needs no Firebase
 project and no network. Covers all five entry shapes, draft autosave, save/edit/delete
-round-trips, and every progress chart's config. Screenshots land in `test/screenshots/`.
+round-trips, the redpoint pyramid, the mobile layout, and every progress chart's
+config. Screenshots land in `test/screenshots/`.
 
 ## Notes
 
