@@ -101,6 +101,8 @@ round-trips, and every progress chart's config. Screenshots land in `test/screen
 - **Finger sets carry an implement** — free text for the edge or block you pulled on,
   independent of grip. Half crimp on an unlevel edge and half crimp on a crimp block are
   the same grip, different implements. It shows up when you hover a progress chart point.
+- **Rope grades are climber shorthand** — `10a`, `11d`, `12a`, with the `5.` prefix
+  spelled out only below 5.10 (`5.9`). No prefix to type or scroll past.
 - **Climbs aren't library items either.** Name is optional free text (autocompleting from
   your own history) — it's shorthand for your memory, not a tracked entity. Grade,
   outcome and attempts are what get charted.

@@ -477,7 +477,8 @@ function drawLapsChart(entries) {
   const pts = [];
   entries.forEach(e => (e.sets || []).forEach(s => {
     if (!s.grade || !scale.includes(s.grade)) return;
-    pts.push({ x: fmtDate(e.date), y: scale.indexOf(s.grade), grade: s.grade, laps: s.laps, timeSec: s.timeSec });
+    pts.push({ x: fmtDate(e.date), y: scale.indexOf(s.grade), grade: s.grade,
+      laps: s.laps, timeSec: s.timeSec, rpe: s.rpe });
   }));
   if (!pts.length) return setEmpty('No lap sets logged yet');
 
@@ -505,7 +506,8 @@ function drawLapsChart(entries) {
           label: ctx => {
             const p = ctx.raw;
             return [`${p.grade}`, `${p.laps ?? '–'} laps`,
-              p.timeSec ? `${fmtSecAsMMSS(p.timeSec)} on the wall` : ''].filter(Boolean);
+              p.timeSec ? `${fmtSecAsMMSS(p.timeSec)} on the wall` : '',
+              p.rpe ? `RPE ${p.rpe}` : ''].filter(Boolean);
           }
         }
       }

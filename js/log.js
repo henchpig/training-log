@@ -43,7 +43,7 @@ const hangSet = () => ({ grip: GRIPS[0], apparatus: 'hb_bimanual', implement: ''
 const repeaterSet = () => ({ grip: GRIPS[0], apparatus: 'hb_bimanual', implement: '', load: '', workSec: '7', restSec: '3', reps: '' });
 const pulseSet = () => ({ grip: GRIPS[0], apparatus: 'no_hang', implement: '', load: '', reps: '', rpe: '' });
 const rehabSet = () => ({ load: '', reps: '', durationSec: '', rpe: '' });
-const lapSet = () => ({ grade: '', laps: '', timeSec: '' });
+const lapSet = () => ({ grade: '', laps: '', timeSec: '', rpe: '' });
 
 function fingerSetFor(protocol) {
   if (protocol === 'repeaters') return repeaterSet();
@@ -118,7 +118,7 @@ function normalizeEntry(e) {
         notes: e.notes || '' };
     case 'rope_endurance':
       return { ...base, sets: e.sets.map(s => ({
-        grade: s.grade, laps: num(s.laps), timeSec: parseDuration(s.timeSec)
+        grade: s.grade, laps: num(s.laps), timeSec: parseDuration(s.timeSec), rpe: num(s.rpe)
       })) };
     default:
       return base;
@@ -382,7 +382,8 @@ function lapsBody(e, i) {
           ${gradeScale('rope_endurance').map(g => `<option value="${g}"${s.grade === g ? ' selected' : ''}>${g}</option>`).join('')}
         </select>
         <input type="number" placeholder="laps" value="${esc(s.laps)}" data-e="${i}" data-s="${si}" data-f="laps">
-        <input type="text" placeholder="time on wall" value="${esc(s.timeSec)}" data-e="${i}" data-s="${si}" data-f="timeSec">
+        <input type="text" placeholder="mm:ss" value="${esc(s.timeSec)}" data-e="${i}" data-s="${si}" data-f="timeSec">
+        <input type="number" step="0.5" placeholder="RPE" value="${esc(s.rpe)}" data-e="${i}" data-s="${si}" data-f="rpe">
         <button class="btn-danger" data-act="del-set" data-e="${i}" data-s="${si}">✕</button>
       </div>`).join('')}
     <button class="btn btn-sm" style="margin-top:6px" data-act="add-set" data-e="${i}">+ Lap set</button>`;

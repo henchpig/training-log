@@ -91,8 +91,13 @@ notes: string
 
 **category: 'rope_endurance'**
 ```
-sets: [{ grade, laps, timeSec }]
+sets: [{ grade, laps, timeSec, rpe }]
 ```
+
+## Grades
+Boulder uses the V scale. Rope uses YDS in climber shorthand — the `5.` prefix is
+written out only below 5.10, so the scale runs `5.6 … 5.9, 10a, 10b … 15a`. Stored
+exactly as displayed; there is no translation layer.
 
 ## Progress queries
 - S&C / Cardio / Finger: `collectionGroup('entries').where('uid','==',uid).where('exerciseId','==',id)`,
