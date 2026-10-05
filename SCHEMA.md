@@ -93,8 +93,15 @@ notes: string
 sets: [{ grade, laps, timeSec, rpe }]
 ```
 
+**category: 'boulder_laps'**
+Power-endurance boulder laps. V scale, and deliberately leaner than rope laps —
+no time or RPE, because the training variables are volume and difficulty.
+```
+sets: [{ grade, laps }]
+```
+
 ## Grades
-Boulder uses the V scale, rope full YDS (`5.9`, `5.12a`) — stored, displayed and
+Boulder and boulder laps use the V scale, rope full YDS (`5.9`, `5.12a`) — stored, displayed and
 picked the same way, with no translation layer.
 
 ## Redpoint pyramid
@@ -125,5 +132,8 @@ a session carrying an `id` is an existing one being edited, and gets no panel.
   actually logged for that protocol.
 - The per-session charts plot the best set of each day; hovering a point shows that
   set's details (implement, apparatus, load, duration, RPE).
+- Boulder Laps charts per session rather than per set: total laps, set count and the
+  hardest grade in the session, overlaid. The grade axis holds an index into `V_GRADES`
+  and carries a formatter so ticks and tooltips read `V5` rather than `6`.
 - Boulder / Rope Redpoint / Rope Endurance: `collectionGroup('entries').where('uid','==',uid).where('category','==','boulder'|'rope_redpoint'|'rope_endurance')`,
   sorted client-side by `date`. Rope Endurance additionally flattens `sets` (one point per set).

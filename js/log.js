@@ -1,6 +1,6 @@
 import {
   S, CATEGORIES, LIBRARY_CATEGORIES, GRIPS, FINGER_PROTOCOLS, APPARATUS,
-  OUTCOMES, gradeScale
+  OUTCOMES, gradeScale, LAP_CATEGORIES
 } from './state.js';
 import { esc, toast, todayStr, uid, parseDuration, debounce, fmtDateShort } from './utils.js';
 import { saveSession, fetchEntriesByExercise, fetchEntriesByCategory } from './db.js';
@@ -108,6 +108,7 @@ const repeaterSet = () => ({ grip: GRIPS[0], apparatus: 'hb_bimanual', implement
 const pulseSet = () => ({ grip: GRIPS[0], apparatus: 'no_hang', implement: '', load: '', reps: '', rpe: '' });
 const rehabSet = () => ({ load: '', reps: '', durationSec: '', rpe: '' });
 const lapSet = () => ({ grade: '', laps: '', timeSec: '', rpe: '' });
+const boulderLapSet = () => ({ grade: '', laps: '' });
 
 function fingerSetFor(protocol) {
   if (protocol === 'repeaters') return repeaterSet();
@@ -120,6 +121,7 @@ function setFactoryFor(e) {
   if (e.category === 'cardio') return intervalSet;
   if (e.category === 'rehab') return rehabSet;
   if (e.category === 'rope_endurance') return lapSet;
+  if (e.category === 'boulder_laps') return boulderLapSet;
   return () => fingerSetFor(e.protocol);
 }
 
@@ -188,6 +190,8 @@ function normalizeEntry(e) {
       return { ...base, sets: e.sets.map(s => ({
         grade: s.grade, laps: num(s.laps), timeSec: parseDuration(s.timeSec), rpe: num(s.rpe)
       })) };
+    case 'boulder_laps':
+      return { ...base, sets: e.sets.map(s => ({ grade: s.grade, laps: num(s.laps) })) };
     default:
       return base;
   }
@@ -279,6 +283,7 @@ function entryBody(e, i) {
     case 'boulder':
     case 'rope_redpoint': return climbBody(e, i);
     case 'rope_endurance': return lapsBody(e, i);
+    case 'boulder_laps': return boulderLapsBody(e, i);
     default: return '';
   }
 }
@@ -477,6 +482,23 @@ function lapsBody(e, i) {
     <button class="btn btn-sm" style="margin-top:6px" data-act="add-set" data-e="${i}">+ Lap set</button>`;
 }
 
+function boulderLapsBody(e, i) {
+  return `
+    <div class="section-label" style="margin-bottom:4px">Lap sets</div>
+    ${setHead('grade', 'laps')}
+    ${e.sets.map((s, si) => `
+      <div class="set-row">
+        <span class="set-num">${si + 1}</span>
+        <select data-e="${i}" data-s="${si}" data-f="grade" style="flex:1 1 90px">
+          <option value="">grade</option>
+          ${gradeScale('boulder_laps').map(g => `<option value="${g}"${s.grade === g ? ' selected' : ''}>${g}</option>`).join('')}
+        </select>
+        <input type="number" placeholder="laps" value="${esc(s.laps)}" data-e="${i}" data-s="${si}" data-f="laps">
+        <button class="btn-danger" data-act="del-set" data-e="${i}" data-s="${si}">✕</button>
+      </div>`).join('')}
+    <button class="btn btn-sm" style="margin-top:6px" data-act="add-set" data-e="${i}">+ Lap set</button>`;
+}
+
 function renderAddPanel() {
   const cat = S.log.addCat;
   let picker = '';
@@ -494,8 +516,8 @@ function renderAddPanel() {
     picker = `<div class="chip-list">
       ${Object.entries(FINGER_PROTOCOLS).map(([v, l]) => `<button class="chip" data-act="add-finger" data-val="${v}">${l}</button>`).join('')}
     </div>`;
-  } else if (cat === 'rope_endurance') {
-    picker = `<div class="chip-list"><button class="chip" data-act="add-laps">+ Add lap block</button></div>`;
+  } else if (LAP_CATEGORIES.includes(cat)) {
+    picker = `<div class="chip-list"><button class="chip" data-act="add-laps" data-val="${cat}">+ Add lap block</button></div>`;
   } else {
     picker = `<div class="chip-list"><button class="chip" data-act="add-climb" data-val="${cat}">+ Add climb</button></div>`;
   }
@@ -582,7 +604,8 @@ function wireLog() {
           addEntry({ category: ds.val, name: '', grade: '', outcome: 'attempt', attempts: '1', notes: '' });
           return;
         case 'add-laps':
-          addEntry({ category: 'rope_endurance', sets: [lapSet()] });
+          addEntry({ category: ds.val,
+            sets: [ds.val === 'boulder_laps' ? boulderLapSet() : lapSet()] });
           return;
         case 'del-entry': S.session.entries.splice(+ds.e, 1); break;
         case 'add-set':

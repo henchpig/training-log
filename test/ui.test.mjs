@@ -160,6 +160,21 @@ await step('add rope endurance laps', async () => {
   await card.locator('input[data-f=timeSec]').first().fill('3:30');
   await card.locator('input[data-f=rpe]').first().fill('7');
 });
+await step('add boulder laps: grade + laps per set', async () => {
+  await page.locator('#tab-log .pill', { hasText: 'Boulder Laps' }).click();
+  await page.locator('#tab-log .chip', { hasText: 'Add lap block' }).click();
+  await page.waitForSelector('.entry-card[data-cat=boulder_laps]');
+  const card = page.locator('.entry-card[data-cat=boulder_laps]');
+  await card.locator('select[data-f=grade]').first().selectOption('V4');
+  await card.locator('input[data-f=laps]').first().fill('4');
+  await card.locator('[data-act=add-set]').click();
+  await page.waitForTimeout(200);
+  const rows = card.locator('.set-row');
+  if (await rows.count() !== 2) throw new Error('expected 2 lap sets');
+  await rows.nth(1).locator('select[data-f=grade]').selectOption('V5');
+  await rows.nth(1).locator('input[data-f=laps]').fill('3');
+});
+
 await step('create a Rehab exercise and log timed-hold sets', async () => {
   await page.click('#tab-nav button[data-tab=library]');
   await page.waitForTimeout(250);
@@ -191,7 +206,7 @@ await step('draft persisted to localStorage', async () => {
   const draft = await page.evaluate(() => localStorage.getItem('tl_draft_testuser'));
   if (!draft) throw new Error('no draft saved');
   const d = JSON.parse(draft);
-  if (d.entries.length !== 5) throw new Error('draft has ' + d.entries.length + ' entries, expected 5');
+  if (d.entries.length !== 6) throw new Error('draft has ' + d.entries.length + ' entries, expected 6');
 });
 await step('save session', async () => {
   await page.fill('#sess-notes', 'test session');
@@ -221,6 +236,12 @@ await step('normalized data shapes are correct', async () => {
   if (rehab.sets[0].load !== 30 || rehab.sets[0].durationSec !== 20 || rehab.sets[0].reps !== null) {
     throw new Error('rehab set wrong: ' + JSON.stringify(rehab.sets[0]));
   }
+  const bl = e.find(x => x.category === 'boulder_laps');
+  if (!bl) throw new Error('no boulder_laps entry saved');
+  if (bl.sets.length !== 2) throw new Error('expected 2 sets, got ' + bl.sets.length);
+  if (bl.sets[0].grade !== 'V4' || bl.sets[0].laps !== 4) throw new Error('set 1 wrong: ' + JSON.stringify(bl.sets[0]));
+  if (bl.sets[1].grade !== 'V5' || bl.sets[1].laps !== 3) throw new Error('set 2 wrong: ' + JSON.stringify(bl.sets[1]));
+  if ('timeSec' in bl.sets[0] || 'rpe' in bl.sets[0]) throw new Error('boulder laps carry no time/RPE');
   const laps = e.find(x => x.category === 'rope_endurance');
   if (laps.sets[0].timeSec !== 210) throw new Error('mm:ss not parsed, got ' + laps.sets[0].timeSec);
   if (laps.sets[0].grade !== '5.11a') throw new Error('grade should store canonical, got ' + laps.sets[0].grade);
@@ -246,7 +267,7 @@ await step('edit loads session back into Log tab', async () => {
   const banner = await page.locator('.edit-banner').count();
   if (!banner) throw new Error('no edit banner');
   const cards = await page.locator('#tab-log .entry-card').count();
-  if (cards !== 5) throw new Error('expected 5 entries loaded, got ' + cards);
+  if (cards !== 6) throw new Error('expected 6 entries loaded, got ' + cards);
   await page.click('#cancel-edit-btn');
   await page.waitForTimeout(200);
 });
@@ -374,6 +395,31 @@ await step('missing-index error surfaces a create link, not a crash', async () =
   const href = await page.locator('#tab-progress .chart-wrap a').getAttribute('href');
   if (!href.startsWith('https://console.firebase.google.com/')) throw new Error('bad link: ' + href);
   await page.evaluate(() => { window.__FAIL_INDEX = false; });
+});
+
+await step('boulder laps chart totals laps and sets, tops out at hardest grade', async () => {
+  await page.locator('#tab-progress .pill', { hasText: 'Boulder Laps' }).click();
+  await page.waitForTimeout(600);
+  const cfg = await page.evaluate(() => window.__CHARTS[window.__CHARTS.length - 1]);
+  const labels = cfg.data.datasets.map(d => d.label);
+  if (labels.length !== 3) throw new Error('expected laps/grade/sets, got ' + labels.join(','));
+  const [laps, grade, sets] = cfg.data.datasets.map(d => d.data[0]);
+  if (laps !== 7) throw new Error('total laps should be 4+3=7, got ' + laps);
+  if (sets !== 2) throw new Error('set count should be 2, got ' + sets);
+  // V5 is the harder of the two. V_GRADES starts VB, V0, V1… so V5 sits at index 6.
+  if (grade !== 6) throw new Error('hardest grade index for V5 should be 6, got ' + grade);
+  const stats = await page.locator('#prog-stats').innerText();
+  if (!stats.includes('V5')) throw new Error('stats should show hardest V5: ' + stats.replace(/\n/g, ' '));
+  if (!stats.includes('7')) throw new Error('stats should show 7 total laps: ' + stats.replace(/\n/g, ' '));
+});
+await step('grade axis reads back as a V grade, not an index', async () => {
+  const label = await page.evaluate(() =>
+    window.__CHARTS[window.__CHARTS.length - 1].options.scales.y1.ticks.callback(6));
+  if (label !== 'V5') throw new Error('axis tick should render V5, got ' + label);
+  const tip = await page.evaluate(() =>
+    window.__CHARTS[window.__CHARTS.length - 1].options.plugins.tooltip.callbacks.label(
+      { datasetIndex: 1, parsed: { y: 6 } }));
+  if (!tip.includes('V5')) throw new Error('tooltip should render V5, got ' + tip);
 });
 
 console.log('\n--- LIBRARY TAB ---');

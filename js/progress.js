@@ -1,4 +1,4 @@
-import { S, CATEGORIES, LIBRARY_CATEGORIES, FINGER_PROTOCOLS, APPARATUS, gradeScale } from './state.js';
+import { S, CATEGORIES, LIBRARY_CATEGORIES, FINGER_PROTOCOLS, APPARATUS, gradeScale, V_GRADES } from './state.js';
 import { esc, fmtSecAsMMSS, fmtDate } from './utils.js';
 import { fetchEntriesByExercise, fetchEntriesByCategory } from './db.js';
 
@@ -45,6 +45,13 @@ const SERIES = {
   pulses: [
     { key: 'load', label: 'Load (lb)', color: C.green },
     { key: 'reps', label: 'Reps', color: C.amber }
+  ],
+  // Volume against difficulty: the grade axis is an index into V_GRADES, so it
+  // needs a formatter to read back as a grade rather than a number.
+  boulder_laps: [
+    { key: 'laps', label: 'Total laps', color: C.amber },
+    { key: 'gradeIdx', label: 'Hardest grade', color: C.green, fmt: v => V_GRADES[v] ?? '' },
+    { key: 'sets', label: 'Sets', color: C.blue }
   ]
 };
 
@@ -126,6 +133,7 @@ async function refresh() {
 
   if (p.category === 'boulder' || p.category === 'rope_redpoint') return drawClimbChart(entries);
   if (p.category === 'rope_endurance') return drawLapsChart(entries);
+  if (p.category === 'boulder_laps') return drawBoulderLapsChart(entries);
   if (p.category === 'finger') return drawFingerChart(entries);
   if (p.category === 'cardio') return drawCardioChart(entries);
   if (p.category === 'rehab') return drawRehabChart(entries);
@@ -218,7 +226,10 @@ function drawOverlay(dates, byDate, series, note) {
       position: i === 1 ? 'right' : 'left',
       display: i < 2,
       grid: { color: i === 0 ? C.border : 'transparent', drawOnChartArea: i === 0 },
-      ticks: { color: s.color, font: { size: 10 } },
+      ticks: {
+        color: s.color, font: { size: 10 },
+        ...(s.fmt ? { stepSize: 1, callback: v => s.fmt(v) } : {})
+      },
       title: { display: i < 2, text: s.label, color: s.color, font: { size: 10 } }
     };
   });
@@ -243,6 +254,11 @@ function drawOverlay(dates, byDate, series, note) {
         legend: { labels: { color: C.muted, boxWidth: 12, font: { size: 11 }, usePointStyle: true } },
         tooltip: {
           callbacks: {
+            label: ctx => {
+              const spec = series[ctx.datasetIndex];
+              const v = ctx.parsed.y;
+              return `${spec.label}: ${spec.fmt ? spec.fmt(v) : v}`;
+            },
             afterBody: items => byDate.get(dates[items[0].dataIndex])?.lines || []
           }
         }
@@ -463,6 +479,40 @@ function drawClimbChart(entries) {
   document.getElementById('prog-legend').innerHTML =
     'Solid = sent · Hollow = attempted &nbsp;|&nbsp; '
     + `<span style="color:${C.green}">1 try</span> · <span style="color:${C.amber}">2–3</span> · <span style="color:${C.red}">4+</span>`;
+}
+
+// ── Boulder Laps ─────────────────────────────────────────────
+// Per session rather than per set: the training variables are how much volume
+// was done, across how many sets, at what difficulty.
+function drawBoulderLapsChart(entries) {
+  const byDate = new Map();
+  entries.forEach(e => {
+    const sets = (e.sets || []).filter(s => s.grade || s.laps != null);
+    if (!sets.length) return;
+    const cur = byDate.get(e.date) || { values: { laps: 0, sets: 0, gradeIdx: null }, lines: [] };
+    sets.forEach(s => {
+      cur.values.laps += s.laps || 0;
+      cur.values.sets += 1;
+      const idx = V_GRADES.indexOf(s.grade);
+      if (idx >= 0) cur.values.gradeIdx = Math.max(cur.values.gradeIdx ?? -1, idx);
+    });
+    cur.lines = cur.lines.concat(sets.map(s => `${s.grade || '–'} × ${s.laps ?? '–'} laps`));
+    byDate.set(e.date, cur);
+  });
+
+  const dates = [...byDate.keys()].sort();
+  if (!dates.length) return setEmpty('No boulder laps logged yet');
+
+  drawOverlay(dates, byDate, SERIES.boulder_laps,
+    'Total laps and set count per session, against the hardest grade in it.');
+
+  const totals = dates.map(d => byDate.get(d).values);
+  const hardest = totals.map(v => v.gradeIdx).filter(v => v != null);
+  statGrid([
+    ['Sessions', dates.length],
+    ['Total laps', totals.reduce((a, v) => a + v.laps, 0)],
+    ['Hardest', hardest.length ? V_GRADES[Math.max(...hardest)] : '–']
+  ]);
 }
 
 // ── Rope Endurance Laps ──────────────────────────────────────
