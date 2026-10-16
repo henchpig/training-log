@@ -57,6 +57,9 @@ export function entryLines(e) {
     case 'rope_endurance':
       return (e.sets || []).map((s, i) =>
         `${i + 1}.  ${s.grade || '–'} × ${s.laps ?? '–'} laps${s.timeSec ? ` · ${fmtSecAsMMSS(s.timeSec)} on the wall` : ''}${s.rpe ? ` @ RPE ${s.rpe}` : ''}`);
+    case 'boulder_laps':
+      return (e.sets || []).map((s, i) =>
+        `${i + 1}.  ${s.grade || '–'} × ${s.laps ?? '–'} laps`);
     default:
       return [];
   }
@@ -87,6 +90,8 @@ export function compactSets(e) {
         return (s.reps || []).map(r =>
           `${head} ${r.load ?? 0}lb×${r.durationSec ?? '–'}s${r.rpe ? ` @${r.rpe}` : ''}`).join(' · ');
       }).join(' · ');
+    case 'boulder_laps':
+      return (e.sets || []).map(s => `${s.grade || '–'}×${s.laps ?? '–'}`).join(' · ');
     case 'cardio':
       if (e.cardioClass === 'endurance' && e.endurance) {
         return `${e.endurance.distance ?? '–'}${e.endurance.distanceUnit || ''} in ${fmtSecAsMMSS(e.endurance.timeSec)}`;

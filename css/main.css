@@ -55,14 +55,14 @@ input::placeholder,textarea::placeholder{color:var(--dim)}
 .tag-finger{background:rgba(85,239,196,.12);color:var(--finger)}
 .tag-cardio{background:rgba(253,121,168,.12);color:var(--cardio)}
 .tag-rehab{background:rgba(162,155,254,.12);color:var(--rehab)}
-.tag-boulder{background:rgba(247,183,49,.12);color:var(--boulder)}
+.tag-boulder,.tag-boulder_laps{background:rgba(247,183,49,.12);color:var(--boulder)}
 .tag-rope_redpoint,.tag-rope_endurance{background:rgba(78,205,196,.12);color:var(--rope)}
 .entry-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--border);border-radius:var(--radius-lg);margin-bottom:10px;overflow:hidden}
 .entry-card[data-cat=sc]{border-left-color:var(--sc)}
 .entry-card[data-cat=finger]{border-left-color:var(--finger)}
 .entry-card[data-cat=cardio]{border-left-color:var(--cardio)}
 .entry-card[data-cat=rehab]{border-left-color:var(--rehab)}
-.entry-card[data-cat=boulder]{border-left-color:var(--boulder)}
+.entry-card[data-cat=boulder],.entry-card[data-cat=boulder_laps]{border-left-color:var(--boulder)}
 .entry-card[data-cat=rope_redpoint],.entry-card[data-cat=rope_endurance]{border-left-color:var(--rope)}
 .entry-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--surface2)}
 .entry-name{font-weight:500;font-size:14px}
