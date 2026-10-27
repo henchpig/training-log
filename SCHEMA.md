@@ -89,8 +89,15 @@ notes: string
 ```
 
 **category: 'rope_endurance'**
+Covers more than one protocol, so the set shape depends on `protocol`. Entries
+written before protocols existed have no such field; `ropeProtocol()` in `state.js`
+reads a missing one as `laps_4x4`, so nothing needed migrating.
 ```
+protocol: 'laps_4x4' | 'crux_intervals',
+// laps_4x4 — a lap set per route:
 sets: [{ grade, laps, timeSec, rpe }]
+// crux_intervals — a set is one run through the crux, the last pass going for the top:
+sets: [{ grade, passes, outcome: 'sent'|'fell', rpe }]
 ```
 
 **category: 'boulder_laps'**
@@ -132,6 +139,9 @@ a session carrying an `id` is an existing one being edited, and gets no panel.
   actually logged for that protocol.
 - The per-session charts plot the best set of each day; hovering a point shows that
   set's details (implement, apparatus, load, duration, RPE).
+- Rope endurance charts behind a protocol tab. 4x4 laps keep the per-set grade scatter;
+  crux intervals chart per session — send rate (share of sets whose final pass finished
+  the route) against the hardest grade, which is what progresses there.
 - Boulder Laps charts per session rather than per set: total laps, set count and the
   hardest grade in the session, overlaid. The grade axis holds an index into `V_GRADES`
   and carries a formatter so ticks and tooltips read `V5` rather than `6`.

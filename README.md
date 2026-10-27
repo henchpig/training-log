@@ -119,6 +119,11 @@ config. Screenshots land in `test/screenshots/`.
   `state.js`; edit that array to change the shape. Only sends fill blocks, a send counts
   toward its own tier only, and blocks fill oldest-first. Tap a filled block (or hover on
   desktop) for its date, grade, name and attempts.
+- **Rope endurance has protocols** — 4x4 Laps and Crux Intervals — picked when you add
+  the entry, each with its own set shape and its own progress chart. Crux interval sets
+  are grade, passes through the crux, whether the final pass finished the route, and RPE;
+  no rest or time on the wall, since those are fixed by the protocol. It charts send rate
+  against grade.
 - **Boulder laps** are their own category — a list of sets, each a V grade and a lap
   count, with no time or RPE. Progress charts the session rather than the set: total laps
   and set count against the hardest grade climbed that day.

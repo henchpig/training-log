@@ -1,8 +1,9 @@
-import { CATEGORIES, FINGER_PROTOCOLS, APPARATUS, OUTCOMES } from './state.js';
+import { CATEGORIES, FINGER_PROTOCOLS, APPARATUS, OUTCOMES, ROPE_PROTOCOLS, ropeProtocol } from './state.js';
 import { esc, fmtSecAsMMSS, paceStr } from './utils.js';
 
 export function entryTitle(e) {
   if (e.category === 'finger') return FINGER_PROTOCOLS[e.protocol] || 'Finger Training';
+  if (e.category === 'rope_endurance') return ROPE_PROTOCOLS[ropeProtocol(e)];
   if (e.category === 'boulder' || e.category === 'rope_redpoint') {
     return [e.grade, e.name].filter(Boolean).join(' · ') || CATEGORIES[e.category];
   }
@@ -55,6 +56,10 @@ export function entryLines(e) {
       return [`${OUTCOMES[e.outcome] || e.outcome} in ${e.attempts ?? 1} attempt${e.attempts === 1 ? '' : 's'}`]
         .concat(e.notes ? [e.notes] : []);
     case 'rope_endurance':
+      if (ropeProtocol(e) === 'crux_intervals') {
+        return (e.sets || []).map((s, i) =>
+          `${i + 1}.  ${s.grade || '–'} · ${s.passes ?? '–'} passes · ${s.outcome || '–'}${s.rpe ? ` @ RPE ${s.rpe}` : ''}`);
+      }
       return (e.sets || []).map((s, i) =>
         `${i + 1}.  ${s.grade || '–'} × ${s.laps ?? '–'} laps${s.timeSec ? ` · ${fmtSecAsMMSS(s.timeSec)} on the wall` : ''}${s.rpe ? ` @ RPE ${s.rpe}` : ''}`);
     case 'boulder_laps':
@@ -91,6 +96,12 @@ export function compactSets(e) {
           `${head} ${r.load ?? 0}lb×${r.durationSec ?? '–'}s${r.rpe ? ` @${r.rpe}` : ''}`).join(' · ');
       }).join(' · ');
     case 'boulder_laps':
+      return (e.sets || []).map(s => `${s.grade || '–'}×${s.laps ?? '–'}`).join(' · ');
+    case 'rope_endurance':
+      if (ropeProtocol(e) === 'crux_intervals') {
+        return (e.sets || []).map(s =>
+          `${s.grade || '–'} ${s.passes ?? '–'}p ${s.outcome === 'sent' ? '✓' : '✗'}`).join(' · ');
+      }
       return (e.sets || []).map(s => `${s.grade || '–'}×${s.laps ?? '–'}`).join(' · ');
     case 'cardio':
       if (e.cardioClass === 'endurance' && e.endurance) {
