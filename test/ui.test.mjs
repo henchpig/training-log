@@ -48,7 +48,11 @@ export async function fetchExercises() { return exercises.map(e => ({...e})).sor
 export async function createExercise(data) { const id = nid(); exercises.push({ id, ...data }); return id; }
 export async function updateExercise(id, data) { Object.assign(exercises.find(e=>e.id===id), data); }
 export async function deleteExercise(id) { exercises = exercises.filter(e=>e.id!==id); }
-export async function fetchSessions() { return sessions.map(s=>({...s})).sort((a,b)=>b.date.localeCompare(a.date)); }
+// mirrors db.js: same-day sessions tie on date, so createdAt breaks it
+export async function fetchSessions() {
+  return sessions.map(s=>({...s}))
+    .sort((a,b)=>b.date.localeCompare(a.date) || ((b.createdAt ?? 0) - (a.createdAt ?? 0)));
+}
 export async function fetchSessionEntries(sessionId) {
   // .reverse() stands in for Firestore's arbitrary auto-ID ordering: the sort
   // has to put them back, it can't just inherit the insertion order.
@@ -58,7 +62,7 @@ export async function saveSession(session) {
   let id = session.id;
   if (id) { Object.assign(sessions.find(s=>s.id===id), { date: session.date, notes: session.notes });
             entries = entries.filter(e=>e.sessionId!==id); }
-  else { id = nid(); sessions.push({ id, date: session.date, notes: session.notes }); }
+  else { id = nid(); sessions.push({ id, date: session.date, notes: session.notes, createdAt: clock++ }); }
   // mirrors db.js: date denormalized onto each entry, order stamped from the
   // position in the session
   session.entries.forEach((e, i) => entries.push({
@@ -351,6 +355,38 @@ await step('entries written before `order` fall back to createdAt', async () => 
   await page.waitForTimeout(300);
   await assertLoggedOrder('createdAt fallback');
   await page.evaluate(() => window.__DB.entries.forEach((e, i) => { e.order = i; }));
+});
+await step('two sessions on one day list newest first', async () => {
+  // pushed out of order, so the list can't just inherit insertion order
+  await page.evaluate(() => {
+    const d = window.__DB.sessions[0].date;
+    window.__DB.sessions.push({ id: 'morning', date: d, notes: 'am', createdAt: 1000 });
+    window.__DB.sessions.push({ id: 'evening', date: d, notes: 'pm', createdAt: 2000 });
+  });
+  await page.click('#hist-back');
+  await page.waitForTimeout(200);
+  await page.click('#tab-nav button[data-tab=log]');
+  await page.waitForTimeout(150);
+  await page.click('#tab-nav button[data-tab=history]');
+  await page.waitForSelector('.session-row');
+  await page.waitForTimeout(300);
+  const ids = await page.$$eval('.session-row', rows => rows.map(r => r.dataset.sess));
+  const pm = ids.indexOf('evening'), am = ids.indexOf('morning');
+  if (pm < 0 || am < 0) throw new Error('injected sessions missing: ' + ids.join(','));
+  if (pm > am) throw new Error('later session should come first, got: ' + ids.join(','));
+  // drop them again and reopen the real session's detail for the edit test
+  await page.evaluate(() => {
+    const keep = window.__DB.sessions.filter(s => s.id !== 'morning' && s.id !== 'evening');
+    window.__DB.sessions.length = 0;
+    window.__DB.sessions.push(...keep);
+  });
+  await page.click('#tab-nav button[data-tab=log]');
+  await page.waitForTimeout(150);
+  await page.click('#tab-nav button[data-tab=history]');
+  await page.waitForSelector('.session-row');
+  await page.waitForTimeout(200);
+  await page.locator('.session-row').first().click();
+  await page.waitForSelector('#hist-edit');
 });
 await step('edit loads session back into Log tab', async () => {
   await page.click('#hist-edit');

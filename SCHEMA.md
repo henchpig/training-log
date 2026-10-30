@@ -28,6 +28,12 @@ Finger training, bouldering and rope never reference this collection.
 }
 ```
 
+History lists sessions newest first. `date` has no time in it, so two sessions
+on the same day tie — Firestore would then order them by document ID, which is
+random for auto-IDs. `createdAt` (when the session was first saved) breaks the
+tie, applied client-side after the `date` query so it needs no composite index.
+Editing a session doesn't move it: the edit writes `updatedAt`, not `createdAt`.
+
 ## users/{uid}/sessions/{sessionId}/entries/{entryId}
 One entry per exercise-block logged in a session, OR one entry per climb for
 bouldering/rope redpoint. `date` and `uid` are denormalized from the parent

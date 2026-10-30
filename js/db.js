@@ -32,7 +32,7 @@ export async function fetchSessions(max = 200) {
   const snap = await getDocs(query(
     collection(db, `${uidPath()}/sessions`), orderBy('date', 'desc'), limit(max)
   ));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(byDateDesc);
 }
 
 export async function fetchSessionEntries(sessionId) {
@@ -102,6 +102,13 @@ export async function fetchEntriesByCategory(category) {
 }
 
 const byDate = (a, b) => (a.date || '').localeCompare(b.date || '');
+
+// Two sessions on the same day tie on `date`, and Firestore breaks that tie by
+// document ID — random, for auto-IDs. createdAt is when the session was first
+// saved, which is the closest thing we store to when it happened. Sorting here
+// rather than with a second orderBy keeps it off a composite index.
+const byDateDesc = (a, b) =>
+  (b.date || '').localeCompare(a.date || '') || (ms(b) - ms(a));
 
 // Firestore hands documents back in auto-ID order, which is effectively random,
 // so a session's entries carry an explicit `order`. Entries written before that
