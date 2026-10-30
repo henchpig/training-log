@@ -33,10 +33,17 @@ One entry per exercise-block logged in a session, OR one entry per climb for
 bouldering/rope redpoint. `date` and `uid` are denormalized from the parent
 session for progress queries via `collectionGroup('entries')`.
 
-Common: `{ uid, date, category, createdAt }`
+Common: `{ uid, date, category, order, createdAt }`
 
 `date` is copied down from the parent session so progress queries never need to
 join back to it.
+
+`order` is the entry's position in the session, stamped on save. Firestore
+returns documents in auto-ID order, and the entries of a session are written in
+parallel, so neither the IDs nor `createdAt` reflect the order they were logged
+in — the explicit field is what History sorts by. Entries written before the
+field existed (the one-off backfill imports) have no `order`; those went in one
+at a time, so `createdAt` is in the logged order and the sort falls back to it.
 
 **category: 'sc'** (Strength & Conditioning)
 ```

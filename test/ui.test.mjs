@@ -31,21 +31,39 @@ let exercises = [];
 let sessions = [];
 let entries = [];  // flat, each has sessionId
 let seq = 1;
+let clock = 1;
 const nid = () => 'id' + (seq++);
+
+// mirrors db.js: Firestore hands entries back in auto-ID order, so they are
+// sorted by the explicit \`order\`, falling back to createdAt for entries
+// written before that field existed.
+const byOrder = (a, b) => {
+  if (a.order != null && b.order != null) return a.order - b.order;
+  if (a.order != null) return -1;
+  if (b.order != null) return 1;
+  return (a.createdAt ?? 0) - (b.createdAt ?? 0);
+};
 
 export async function fetchExercises() { return exercises.map(e => ({...e})).sort((a,b)=>a.name.localeCompare(b.name)); }
 export async function createExercise(data) { const id = nid(); exercises.push({ id, ...data }); return id; }
 export async function updateExercise(id, data) { Object.assign(exercises.find(e=>e.id===id), data); }
 export async function deleteExercise(id) { exercises = exercises.filter(e=>e.id!==id); }
 export async function fetchSessions() { return sessions.map(s=>({...s})).sort((a,b)=>b.date.localeCompare(a.date)); }
-export async function fetchSessionEntries(sessionId) { return entries.filter(e=>e.sessionId===sessionId).map(e=>({...e})); }
+export async function fetchSessionEntries(sessionId) {
+  // .reverse() stands in for Firestore's arbitrary auto-ID ordering: the sort
+  // has to put them back, it can't just inherit the insertion order.
+  return entries.filter(e=>e.sessionId===sessionId).map(e=>({...e})).reverse().sort(byOrder);
+}
 export async function saveSession(session) {
   let id = session.id;
   if (id) { Object.assign(sessions.find(s=>s.id===id), { date: session.date, notes: session.notes });
             entries = entries.filter(e=>e.sessionId!==id); }
   else { id = nid(); sessions.push({ id, date: session.date, notes: session.notes }); }
-  // mirrors db.js: date denormalized onto each entry
-  session.entries.forEach(e => entries.push({ id: nid(), sessionId: id, uid: 'testuser', date: session.date, ...e }));
+  // mirrors db.js: date denormalized onto each entry, order stamped from the
+  // position in the session
+  session.entries.forEach((e, i) => entries.push({
+    id: nid(), sessionId: id, ...e, uid: 'testuser', date: session.date, order: i, createdAt: clock++
+  }));
   window.__DB = { exercises, sessions, entries };
   return id;
 }
@@ -296,6 +314,43 @@ await step('detail view renders all entries', async () => {
   for (const want of ['Bench Press', 'Max Hang', 'V5', 'blue slab', '4 laps']) {
     if (!txt.includes(want)) throw new Error('detail missing "' + want + '"');
   }
+});
+
+// The sequence the entries were added in, up at the top of this file.
+const LOGGED_ORDER = ['Bench Press', 'Max Hang', 'blue slab', '4x4 Laps',
+  'Boulder Laps', 'Crux Intervals', 'Iso Wrist Extension'];
+const assertLoggedOrder = async (what) => {
+  const txt = await page.locator('#tab-history').innerText();
+  const at = LOGGED_ORDER.map(t => [t, txt.indexOf(t)]);
+  const missing = at.find(([, i]) => i < 0);
+  if (missing) throw new Error(what + ': "' + missing[0] + '" not in the detail view');
+  for (let i = 1; i < at.length; i++) {
+    if (at[i][1] < at[i - 1][1]) {
+      throw new Error(what + ': "' + at[i][0] + '" came before "' + at[i - 1][0] + '"');
+    }
+  }
+};
+await step('entries are stamped with the order they were logged in', async () => {
+  const stamped = await page.evaluate(() =>
+    window.__DB.entries.map(e => e.order));
+  const want = stamped.map((_, i) => i);
+  if (JSON.stringify(stamped) !== JSON.stringify(want)) {
+    throw new Error('expected order ' + JSON.stringify(want) + ', got ' + JSON.stringify(stamped));
+  }
+});
+await step('detail view keeps the logged order', () => assertLoggedOrder('detail view'));
+await step('entries written before `order` fall back to createdAt', async () => {
+  // The backfill imports wrote one entry at a time, so their createdAt is in
+  // the logged order even though they carry no `order` field.
+  await page.evaluate(() => window.__DB.entries.forEach(e => { delete e.order; }));
+  // re-entering the tab refetches, and the detail view is still open
+  await page.click('#tab-nav button[data-tab=log]');
+  await page.waitForTimeout(200);
+  await page.click('#tab-nav button[data-tab=history]');
+  await page.waitForSelector('#hist-edit');
+  await page.waitForTimeout(300);
+  await assertLoggedOrder('createdAt fallback');
+  await page.evaluate(() => window.__DB.entries.forEach((e, i) => { e.order = i; }));
 });
 await step('edit loads session back into Log tab', async () => {
   await page.click('#hist-edit');
