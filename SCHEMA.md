@@ -28,15 +28,28 @@ Finger training, bouldering and rope never reference this collection.
 }
 ```
 
+History lists sessions newest first. `date` has no time in it, so two sessions
+on the same day tie — Firestore would then order them by document ID, which is
+random for auto-IDs. `createdAt` (when the session was first saved) breaks the
+tie, applied client-side after the `date` query so it needs no composite index.
+Editing a session doesn't move it: the edit writes `updatedAt`, not `createdAt`.
+
 ## users/{uid}/sessions/{sessionId}/entries/{entryId}
 One entry per exercise-block logged in a session, OR one entry per climb for
 bouldering/rope redpoint. `date` and `uid` are denormalized from the parent
 session for progress queries via `collectionGroup('entries')`.
 
-Common: `{ uid, date, category, createdAt }`
+Common: `{ uid, date, category, order, createdAt }`
 
 `date` is copied down from the parent session so progress queries never need to
 join back to it.
+
+`order` is the entry's position in the session, stamped on save. Firestore
+returns documents in auto-ID order, and the entries of a session are written in
+parallel, so neither the IDs nor `createdAt` reflect the order they were logged
+in — the explicit field is what History sorts by. Entries written before the
+field existed (the one-off backfill imports) have no `order`; those went in one
+at a time, so `createdAt` is in the logged order and the sort falls back to it.
 
 **category: 'sc'** (Strength & Conditioning)
 ```
@@ -89,8 +102,15 @@ notes: string
 ```
 
 **category: 'rope_endurance'**
+Covers more than one protocol, so the set shape depends on `protocol`. Entries
+written before protocols existed have no such field; `ropeProtocol()` in `state.js`
+reads a missing one as `laps_4x4`, so nothing needed migrating.
 ```
+protocol: 'laps_4x4' | 'crux_intervals',
+// laps_4x4 — a lap set per route:
 sets: [{ grade, laps, timeSec, rpe }]
+// crux_intervals — a set is one run through the crux, the last pass going for the top:
+sets: [{ grade, passes, outcome: 'sent'|'fell', rpe }]
 ```
 
 **category: 'boulder_laps'**
@@ -132,6 +152,9 @@ a session carrying an `id` is an existing one being edited, and gets no panel.
   actually logged for that protocol.
 - The per-session charts plot the best set of each day; hovering a point shows that
   set's details (implement, apparatus, load, duration, RPE).
+- Rope endurance charts behind a protocol tab. 4x4 laps keep the per-set grade scatter;
+  crux intervals chart per session — send rate (share of sets whose final pass finished
+  the route) against the hardest grade, which is what progresses there.
 - Boulder Laps charts per session rather than per set: total laps, set count and the
   hardest grade in the session, overlaid. The grade axis holds an index into `V_GRADES`
   and carries a formatter so ticks and tooltips read `V5` rather than `6`.

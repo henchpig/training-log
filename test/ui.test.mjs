@@ -31,21 +31,43 @@ let exercises = [];
 let sessions = [];
 let entries = [];  // flat, each has sessionId
 let seq = 1;
+let clock = 1;
 const nid = () => 'id' + (seq++);
+
+// mirrors db.js: Firestore hands entries back in auto-ID order, so they are
+// sorted by the explicit \`order\`, falling back to createdAt for entries
+// written before that field existed.
+const byOrder = (a, b) => {
+  if (a.order != null && b.order != null) return a.order - b.order;
+  if (a.order != null) return -1;
+  if (b.order != null) return 1;
+  return (a.createdAt ?? 0) - (b.createdAt ?? 0);
+};
 
 export async function fetchExercises() { return exercises.map(e => ({...e})).sort((a,b)=>a.name.localeCompare(b.name)); }
 export async function createExercise(data) { const id = nid(); exercises.push({ id, ...data }); return id; }
 export async function updateExercise(id, data) { Object.assign(exercises.find(e=>e.id===id), data); }
 export async function deleteExercise(id) { exercises = exercises.filter(e=>e.id!==id); }
-export async function fetchSessions() { return sessions.map(s=>({...s})).sort((a,b)=>b.date.localeCompare(a.date)); }
-export async function fetchSessionEntries(sessionId) { return entries.filter(e=>e.sessionId===sessionId).map(e=>({...e})); }
+// mirrors db.js: same-day sessions tie on date, so createdAt breaks it
+export async function fetchSessions() {
+  return sessions.map(s=>({...s}))
+    .sort((a,b)=>b.date.localeCompare(a.date) || ((b.createdAt ?? 0) - (a.createdAt ?? 0)));
+}
+export async function fetchSessionEntries(sessionId) {
+  // .reverse() stands in for Firestore's arbitrary auto-ID ordering: the sort
+  // has to put them back, it can't just inherit the insertion order.
+  return entries.filter(e=>e.sessionId===sessionId).map(e=>({...e})).reverse().sort(byOrder);
+}
 export async function saveSession(session) {
   let id = session.id;
   if (id) { Object.assign(sessions.find(s=>s.id===id), { date: session.date, notes: session.notes });
             entries = entries.filter(e=>e.sessionId!==id); }
-  else { id = nid(); sessions.push({ id, date: session.date, notes: session.notes }); }
-  // mirrors db.js: date denormalized onto each entry
-  session.entries.forEach(e => entries.push({ id: nid(), sessionId: id, uid: 'testuser', date: session.date, ...e }));
+  else { id = nid(); sessions.push({ id, date: session.date, notes: session.notes, createdAt: clock++ }); }
+  // mirrors db.js: date denormalized onto each entry, order stamped from the
+  // position in the session
+  session.entries.forEach((e, i) => entries.push({
+    id: nid(), sessionId: id, ...e, uid: 'testuser', date: session.date, order: i, createdAt: clock++
+  }));
   window.__DB = { exercises, sessions, entries };
   return id;
 }
@@ -153,7 +175,7 @@ await step('add boulder climb, flash locks attempts to 1', async () => {
 });
 await step('add rope endurance laps', async () => {
   await page.locator('#tab-log .pill', { hasText: 'Rope Endurance Laps' }).click();
-  await page.locator('#tab-log .chip', { hasText: 'Add lap block' }).click();
+  await page.locator('#tab-log .chip', { hasText: '4x4 Laps' }).click();
   const card = page.locator('.entry-card[data-cat=rope_endurance]');
   await card.locator('select[data-f=grade]').first().selectOption('5.11a');
   await card.locator('input[data-f=laps]').first().fill('4');
@@ -173,6 +195,29 @@ await step('add boulder laps: grade + laps per set', async () => {
   if (await rows.count() !== 2) throw new Error('expected 2 lap sets');
   await rows.nth(1).locator('select[data-f=grade]').selectOption('V5');
   await rows.nth(1).locator('input[data-f=laps]').fill('3');
+});
+
+await step('add crux intervals: grade, passes, finish, RPE', async () => {
+  await page.locator('#tab-log .pill', { hasText: 'Rope Endurance Laps' }).click();
+  await page.locator('#tab-log .chip', { hasText: 'Crux Intervals' }).click();
+  await page.waitForTimeout(300);
+  const cards = page.locator('.entry-card[data-cat=rope_endurance]');
+  if (await cards.count() !== 2) throw new Error('expected a 4x4 and a crux entry');
+  const crux = cards.nth(1);
+  const title = await crux.locator('.entry-name').innerText();
+  if (title !== 'Crux Intervals') throw new Error('header should name the protocol, got ' + title);
+  // Four passes is the protocol default.
+  if (await crux.locator('input[data-f=passes]').first().inputValue() !== '4') {
+    throw new Error('passes should default to 4');
+  }
+  await crux.locator('select[data-f=grade]').first().selectOption('5.12a');
+  await crux.locator('select[data-f=outcome]').first().selectOption('sent');
+  await crux.locator('input[data-f=rpe]').first().fill('9');
+  await crux.locator('[data-act=add-set]').click();
+  await page.waitForTimeout(200);
+  const rows = crux.locator('.set-row');
+  await rows.nth(1).locator('select[data-f=grade]').selectOption('5.12a');
+  await rows.nth(1).locator('select[data-f=outcome]').selectOption('fell');
 });
 
 await step('create a Rehab exercise and log timed-hold sets', async () => {
@@ -206,7 +251,7 @@ await step('draft persisted to localStorage', async () => {
   const draft = await page.evaluate(() => localStorage.getItem('tl_draft_testuser'));
   if (!draft) throw new Error('no draft saved');
   const d = JSON.parse(draft);
-  if (d.entries.length !== 6) throw new Error('draft has ' + d.entries.length + ' entries, expected 6');
+  if (d.entries.length !== 7) throw new Error('draft has ' + d.entries.length + ' entries, expected 7');
 });
 await step('save session', async () => {
   await page.fill('#sess-notes', 'test session');
@@ -242,7 +287,20 @@ await step('normalized data shapes are correct', async () => {
   if (bl.sets[0].grade !== 'V4' || bl.sets[0].laps !== 4) throw new Error('set 1 wrong: ' + JSON.stringify(bl.sets[0]));
   if (bl.sets[1].grade !== 'V5' || bl.sets[1].laps !== 3) throw new Error('set 2 wrong: ' + JSON.stringify(bl.sets[1]));
   if ('timeSec' in bl.sets[0] || 'rpe' in bl.sets[0]) throw new Error('boulder laps carry no time/RPE');
-  const laps = e.find(x => x.category === 'rope_endurance');
+  const ropes = e.filter(x => x.category === 'rope_endurance');
+  if (ropes.length !== 2) throw new Error('expected 2 rope entries, got ' + ropes.length);
+  const crux = ropes.find(x => x.protocol === 'crux_intervals');
+  if (!crux) throw new Error('crux entry lost its protocol');
+  if (crux.sets.length !== 2) throw new Error('expected 2 crux sets');
+  if (crux.sets[0].passes !== 4 || crux.sets[0].outcome !== 'sent' || crux.sets[0].rpe !== 9) {
+    throw new Error('crux set 1 wrong: ' + JSON.stringify(crux.sets[0]));
+  }
+  if (crux.sets[1].outcome !== 'fell') throw new Error('crux set 2 should be a fall');
+  if ('timeSec' in crux.sets[0] || 'laps' in crux.sets[0]) {
+    throw new Error('crux sets carry no time or laps');
+  }
+  const laps = ropes.find(x => x.protocol === 'laps_4x4');
+  if (!laps) throw new Error('4x4 entry should be stamped laps_4x4');
   if (laps.sets[0].timeSec !== 210) throw new Error('mm:ss not parsed, got ' + laps.sets[0].timeSec);
   if (laps.sets[0].grade !== '5.11a') throw new Error('grade should store canonical, got ' + laps.sets[0].grade);
   if (laps.sets[0].rpe !== 7) throw new Error('lap rpe not stored, got ' + laps.sets[0].rpe);
@@ -261,13 +319,82 @@ await step('detail view renders all entries', async () => {
     if (!txt.includes(want)) throw new Error('detail missing "' + want + '"');
   }
 });
+
+// The sequence the entries were added in, up at the top of this file.
+const LOGGED_ORDER = ['Bench Press', 'Max Hang', 'blue slab', '4x4 Laps',
+  'Boulder Laps', 'Crux Intervals', 'Iso Wrist Extension'];
+const assertLoggedOrder = async (what) => {
+  const txt = await page.locator('#tab-history').innerText();
+  const at = LOGGED_ORDER.map(t => [t, txt.indexOf(t)]);
+  const missing = at.find(([, i]) => i < 0);
+  if (missing) throw new Error(what + ': "' + missing[0] + '" not in the detail view');
+  for (let i = 1; i < at.length; i++) {
+    if (at[i][1] < at[i - 1][1]) {
+      throw new Error(what + ': "' + at[i][0] + '" came before "' + at[i - 1][0] + '"');
+    }
+  }
+};
+await step('entries are stamped with the order they were logged in', async () => {
+  const stamped = await page.evaluate(() =>
+    window.__DB.entries.map(e => e.order));
+  const want = stamped.map((_, i) => i);
+  if (JSON.stringify(stamped) !== JSON.stringify(want)) {
+    throw new Error('expected order ' + JSON.stringify(want) + ', got ' + JSON.stringify(stamped));
+  }
+});
+await step('detail view keeps the logged order', () => assertLoggedOrder('detail view'));
+await step('entries written before `order` fall back to createdAt', async () => {
+  // The backfill imports wrote one entry at a time, so their createdAt is in
+  // the logged order even though they carry no `order` field.
+  await page.evaluate(() => window.__DB.entries.forEach(e => { delete e.order; }));
+  // re-entering the tab refetches, and the detail view is still open
+  await page.click('#tab-nav button[data-tab=log]');
+  await page.waitForTimeout(200);
+  await page.click('#tab-nav button[data-tab=history]');
+  await page.waitForSelector('#hist-edit');
+  await page.waitForTimeout(300);
+  await assertLoggedOrder('createdAt fallback');
+  await page.evaluate(() => window.__DB.entries.forEach((e, i) => { e.order = i; }));
+});
+await step('two sessions on one day list newest first', async () => {
+  // pushed out of order, so the list can't just inherit insertion order
+  await page.evaluate(() => {
+    const d = window.__DB.sessions[0].date;
+    window.__DB.sessions.push({ id: 'morning', date: d, notes: 'am', createdAt: 1000 });
+    window.__DB.sessions.push({ id: 'evening', date: d, notes: 'pm', createdAt: 2000 });
+  });
+  await page.click('#hist-back');
+  await page.waitForTimeout(200);
+  await page.click('#tab-nav button[data-tab=log]');
+  await page.waitForTimeout(150);
+  await page.click('#tab-nav button[data-tab=history]');
+  await page.waitForSelector('.session-row');
+  await page.waitForTimeout(300);
+  const ids = await page.$$eval('.session-row', rows => rows.map(r => r.dataset.sess));
+  const pm = ids.indexOf('evening'), am = ids.indexOf('morning');
+  if (pm < 0 || am < 0) throw new Error('injected sessions missing: ' + ids.join(','));
+  if (pm > am) throw new Error('later session should come first, got: ' + ids.join(','));
+  // drop them again and reopen the real session's detail for the edit test
+  await page.evaluate(() => {
+    const keep = window.__DB.sessions.filter(s => s.id !== 'morning' && s.id !== 'evening');
+    window.__DB.sessions.length = 0;
+    window.__DB.sessions.push(...keep);
+  });
+  await page.click('#tab-nav button[data-tab=log]');
+  await page.waitForTimeout(150);
+  await page.click('#tab-nav button[data-tab=history]');
+  await page.waitForSelector('.session-row');
+  await page.waitForTimeout(200);
+  await page.locator('.session-row').first().click();
+  await page.waitForSelector('#hist-edit');
+});
 await step('edit loads session back into Log tab', async () => {
   await page.click('#hist-edit');
   await page.waitForTimeout(400);
   const banner = await page.locator('.edit-banner').count();
   if (!banner) throw new Error('no edit banner');
   const cards = await page.locator('#tab-log .entry-card').count();
-  if (cards !== 6) throw new Error('expected 6 entries loaded, got ' + cards);
+  if (cards !== 7) throw new Error('expected 7 entries loaded, got ' + cards);
   await page.click('#cancel-edit-btn');
   await page.waitForTimeout(200);
 });
@@ -333,6 +460,8 @@ await step('boulder scatter renders with grade axis', async () => {
 });
 await step('endurance laps chart renders with no stat overview', async () => {
   await page.locator('#tab-progress .pill', { hasText: 'Rope Endurance Laps' }).click();
+  await page.waitForTimeout(500);
+  await page.locator('#tab-progress .pill', { hasText: '4x4 Laps' }).click();
   await page.waitForTimeout(500);
   const stats = await page.locator('#prog-stats').innerText();
   if (stats.trim()) throw new Error('overview should be gone, got: ' + stats.replace(/\n/g, ' '));
@@ -420,6 +549,54 @@ await step('grade axis reads back as a V grade, not an index', async () => {
     window.__CHARTS[window.__CHARTS.length - 1].options.plugins.tooltip.callbacks.label(
       { datasetIndex: 1, parsed: { y: 6 } }));
   if (!tip.includes('V5')) throw new Error('tooltip should render V5, got ' + tip);
+});
+
+await step('crux intervals chart: send rate against grade', async () => {
+  await page.locator('#tab-progress .pill', { hasText: 'Rope Endurance Laps' }).click();
+  await page.waitForTimeout(400);
+  await page.locator('#tab-progress .pill', { hasText: 'Crux Intervals' }).click();
+  await page.waitForTimeout(600);
+  const cfg = await page.evaluate(() => window.__CHARTS[window.__CHARTS.length - 1]);
+  const labels = cfg.data.datasets.map(d => d.label);
+  if (!labels.some(l => /Send rate/.test(l))) throw new Error('no send-rate series: ' + labels.join(','));
+  const [rate, grade, sets] = cfg.data.datasets.map(d => d.data[0]);
+  if (rate !== 50) throw new Error('1 of 2 sets sent should read 50%, got ' + rate);
+  if (sets !== 2) throw new Error('expected 2 sets, got ' + sets);
+  const label = await page.evaluate(g =>
+    window.__CHARTS[window.__CHARTS.length - 1].options.scales.y1.ticks.callback(g), grade);
+  if (label !== '5.12a') throw new Error('grade axis should read 5.12a, got ' + label);
+  const stats = await page.locator('#prog-stats').innerText();
+  if (!stats.includes('50%')) throw new Error('stats should show 50% send rate: ' + stats.replace(/\n/g,' '));
+});
+await step('pre-protocol rope entries still read as 4x4', async () => {
+  // Entries written before rope protocols existed have no protocol field. They
+  // must keep charting as 4x4 laps rather than disappearing.
+  await page.evaluate(() => {
+    window.__DB.entries.push({
+      id: 'legacy1', sessionId: 'legacy', uid: 'testuser', date: '2026-01-05',
+      category: 'rope_endurance',
+      sets: [{ grade: '5.10b', laps: 4, timeSec: 500, rpe: 6 }]
+    });
+  });
+  await page.click('#tab-nav button[data-tab=log]');
+  await page.waitForTimeout(200);
+  await page.click('#tab-nav button[data-tab=progress]');
+  await page.waitForTimeout(300);
+  await page.locator('#tab-progress .pill', { hasText: 'Rope Endurance Laps' }).click();
+  await page.waitForTimeout(400);
+  await page.locator('#tab-progress .pill', { hasText: '4x4 Laps' }).click();
+  await page.waitForTimeout(600);
+  const cfg = await page.evaluate(() => window.__CHARTS[window.__CHARTS.length - 1]);
+  const grades = cfg.data.datasets[0].data.map(p => p.grade);
+  if (!grades.includes('5.10b')) {
+    throw new Error('legacy entry dropped from the 4x4 chart: ' + grades.join(','));
+  }
+});
+await step('the two rope protocols chart separately', async () => {
+  await page.locator('#tab-progress .pill', { hasText: '4x4 Laps' }).click();
+  await page.waitForTimeout(500);
+  const cfg = await page.evaluate(() => window.__CHARTS[window.__CHARTS.length - 1]);
+  if (cfg.type !== 'scatter') throw new Error('4x4 should still be the scatter, got ' + cfg.type);
 });
 
 console.log('\n--- LIBRARY TAB ---');

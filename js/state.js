@@ -12,6 +12,15 @@ export const CATEGORIES = {
 // Categories logged as a list of lap sets rather than individual climbs.
 export const LAP_CATEGORIES = ['boulder_laps', 'rope_endurance'];
 
+// Rope endurance covers more than one protocol, so a set's shape depends on
+// which. Entries written before this existed have no protocol field; everything
+// reads it through ropeProtocol(), which calls those 4x4 laps.
+export const ROPE_PROTOCOLS = {
+  laps_4x4: '4x4 Laps',
+  crux_intervals: 'Crux Intervals'
+};
+export const ropeProtocol = e => e?.protocol || 'laps_4x4';
+
 // Categories with a reusable, user-managed exercise library. Finger training is
 // excluded on purpose: protocol + grip + apparatus fully describe the work, so a
 // library entry would only be a redundant name.

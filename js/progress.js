@@ -1,4 +1,5 @@
-import { S, CATEGORIES, LIBRARY_CATEGORIES, FINGER_PROTOCOLS, APPARATUS, gradeScale, V_GRADES } from './state.js';
+import { S, CATEGORIES, LIBRARY_CATEGORIES, FINGER_PROTOCOLS, APPARATUS, gradeScale, V_GRADES,
+         YDS_GRADES, ROPE_PROTOCOLS, ropeProtocol } from './state.js';
 import { esc, fmtSecAsMMSS, fmtDate } from './utils.js';
 import { fetchEntriesByExercise, fetchEntriesByCategory } from './db.js';
 
@@ -51,6 +52,11 @@ const SERIES = {
   boulder_laps: [
     { key: 'laps', label: 'Total laps', color: C.amber },
     { key: 'gradeIdx', label: 'Hardest grade', color: C.green, fmt: v => V_GRADES[v] ?? '' },
+    { key: 'sets', label: 'Sets', color: C.blue }
+  ],
+  crux_intervals: [
+    { key: 'sendRate', label: 'Send rate (%)', color: C.amber },
+    { key: 'gradeIdx', label: 'Hardest grade', color: C.green, fmt: v => YDS_GRADES[v] ?? '' },
     { key: 'sets', label: 'Sets', color: C.blue }
   ]
 };
@@ -119,6 +125,19 @@ async function refresh() {
       p.grip = null;
       renderProgress();
     });
+  } else if (p.category === 'rope_endurance') {
+    if (!p.ropeProtocol) p.ropeProtocol = 'laps_4x4';
+    sub.innerHTML = `<div class="sub-picker">
+      <div class="section-label" style="margin-bottom:6px">Protocol</div>
+      <div class="pill-row" style="margin-bottom:0">
+        ${Object.entries(ROPE_PROTOCOLS).map(([v, l]) =>
+          `<span class="pill${p.ropeProtocol === v ? ' active' : ''}" data-prog-rope="${v}">${l}</span>`).join('')}
+      </div>
+    </div>`;
+    sub.querySelectorAll('[data-prog-rope]').forEach(n => n.onclick = () => {
+      p.ropeProtocol = n.dataset.progRope;
+      renderProgress();
+    });
   } else {
     sub.innerHTML = '';
   }
@@ -132,7 +151,12 @@ async function refresh() {
   if (!entries.length) return setEmpty('No data yet');
 
   if (p.category === 'boulder' || p.category === 'rope_redpoint') return drawClimbChart(entries);
-  if (p.category === 'rope_endurance') return drawLapsChart(entries);
+  if (p.category === 'rope_endurance') {
+    const proto = p.ropeProtocol || 'laps_4x4';
+    const forProto = entries.filter(e => ropeProtocol(e) === proto);
+    if (!forProto.length) return setEmpty(`No ${ROPE_PROTOCOLS[proto]} logged yet`);
+    return proto === 'crux_intervals' ? drawCruxChart(forProto) : drawLapsChart(forProto);
+  }
   if (p.category === 'boulder_laps') return drawBoulderLapsChart(entries);
   if (p.category === 'finger') return drawFingerChart(entries);
   if (p.category === 'cardio') return drawCardioChart(entries);
@@ -512,6 +536,45 @@ function drawBoulderLapsChart(entries) {
     ['Sessions', dates.length],
     ['Total laps', totals.reduce((a, v) => a + v.laps, 0)],
     ['Hardest', hardest.length ? V_GRADES[Math.max(...hardest)] : '–']
+  ]);
+}
+
+// ── Crux Intervals ───────────────────────────────────────────
+// Progression here is grade and how often the last pass actually finishes the
+// route, so the chart is send rate against difficulty, per session.
+function drawCruxChart(entries) {
+  const byDate = new Map();
+  entries.forEach(e => {
+    const sets = (e.sets || []).filter(s => s.grade || s.outcome);
+    if (!sets.length) return;
+    const cur = byDate.get(e.date)
+      || { values: { sendRate: 0, gradeIdx: null, sets: 0 }, lines: [], _sent: 0 };
+    sets.forEach(s => {
+      cur.values.sets += 1;
+      if (s.outcome === 'sent') cur._sent += 1;
+      const idx = YDS_GRADES.indexOf(s.grade);
+      if (idx >= 0) cur.values.gradeIdx = Math.max(cur.values.gradeIdx ?? -1, idx);
+    });
+    cur.values.sendRate = Math.round((cur._sent / cur.values.sets) * 100);
+    cur.lines = cur.lines.concat(sets.map(s =>
+      `${s.grade || '–'} · ${s.passes ?? '–'} passes · ${s.outcome || '–'}`));
+    byDate.set(e.date, cur);
+  });
+
+  const dates = [...byDate.keys()].sort();
+  if (!dates.length) return setEmpty('No crux intervals logged yet');
+
+  drawOverlay(dates, byDate, SERIES.crux_intervals,
+    'Send rate is the share of sets whose final pass finished the route.');
+
+  const vals = dates.map(d => byDate.get(d).values);
+  const hardest = vals.map(v => v.gradeIdx).filter(v => v != null);
+  const totalSets = vals.reduce((a, v) => a + v.sets, 0);
+  const totalSent = dates.reduce((a, d) => a + byDate.get(d)._sent, 0);
+  statGrid([
+    ['Sessions', dates.length],
+    ['Send rate', totalSets ? `${Math.round((totalSent / totalSets) * 100)}%` : '–'],
+    ['Hardest', hardest.length ? YDS_GRADES[Math.max(...hardest)] : '–']
   ]);
 }
 

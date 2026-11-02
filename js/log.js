@@ -1,6 +1,6 @@
 import {
   S, CATEGORIES, LIBRARY_CATEGORIES, GRIPS, FINGER_PROTOCOLS, APPARATUS,
-  OUTCOMES, gradeScale, LAP_CATEGORIES
+  OUTCOMES, gradeScale, LAP_CATEGORIES, ROPE_PROTOCOLS, ropeProtocol
 } from './state.js';
 import { esc, toast, todayStr, uid, parseDuration, debounce, fmtDateShort } from './utils.js';
 import { saveSession, fetchEntriesByExercise, fetchEntriesByCategory } from './db.js';
@@ -109,6 +109,9 @@ const pulseSet = () => ({ grip: GRIPS[0], apparatus: 'no_hang', implement: '', l
 const rehabSet = () => ({ load: '', reps: '', durationSec: '', rpe: '' });
 const lapSet = () => ({ grade: '', laps: '', timeSec: '', rpe: '' });
 const boulderLapSet = () => ({ grade: '', laps: '' });
+// One set = one full run through the crux sequence, the last pass continuing to
+// the top. Four passes is the protocol, but it gets bent, so it's editable.
+const cruxSet = () => ({ grade: '', passes: '4', outcome: 'fell', rpe: '' });
 
 function fingerSetFor(protocol) {
   if (protocol === 'repeaters') return repeaterSet();
@@ -120,7 +123,9 @@ function setFactoryFor(e) {
   if (e.category === 'sc') return scSet;
   if (e.category === 'cardio') return intervalSet;
   if (e.category === 'rehab') return rehabSet;
-  if (e.category === 'rope_endurance') return lapSet;
+  if (e.category === 'rope_endurance') {
+    return ropeProtocol(e) === 'crux_intervals' ? cruxSet : lapSet;
+  }
   if (e.category === 'boulder_laps') return boulderLapSet;
   return () => fingerSetFor(e.protocol);
 }
@@ -186,10 +191,17 @@ function normalizeEntry(e) {
       return { ...base, name: e.name || null, grade: e.grade,
         outcome: e.outcome, attempts: e.outcome === 'flash' ? 1 : (num(e.attempts) || 1),
         notes: e.notes || '' };
-    case 'rope_endurance':
-      return { ...base, sets: e.sets.map(s => ({
+    case 'rope_endurance': {
+      const protocol = ropeProtocol(e);
+      if (protocol === 'crux_intervals') {
+        return { ...base, protocol, sets: e.sets.map(s => ({
+          grade: s.grade, passes: num(s.passes), outcome: s.outcome, rpe: num(s.rpe)
+        })) };
+      }
+      return { ...base, protocol, sets: e.sets.map(s => ({
         grade: s.grade, laps: num(s.laps), timeSec: parseDuration(s.timeSec), rpe: num(s.rpe)
       })) };
+    }
     case 'boulder_laps':
       return { ...base, sets: e.sets.map(s => ({ grade: s.grade, laps: num(s.laps) })) };
     default:
@@ -254,6 +266,7 @@ export function renderLog() {
 
 function renderEntry(e, i) {
   const title = e.category === 'finger' ? FINGER_PROTOCOLS[e.protocol]
+    : e.category === 'rope_endurance' ? ROPE_PROTOCOLS[ropeProtocol(e)]
     : (e.exerciseName || CATEGORIES[e.category]);
   // Climb/lap entries have no exercise name, so the title is already the category
   // label — don't repeat it in a tag beside itself.
@@ -282,7 +295,8 @@ function entryBody(e, i) {
     case 'finger': return fingerBody(e, i);
     case 'boulder':
     case 'rope_redpoint': return climbBody(e, i);
-    case 'rope_endurance': return lapsBody(e, i);
+    case 'rope_endurance':
+      return ropeProtocol(e) === 'crux_intervals' ? cruxBody(e, i) : lapsBody(e, i);
     case 'boulder_laps': return boulderLapsBody(e, i);
     default: return '';
   }
@@ -482,6 +496,28 @@ function lapsBody(e, i) {
     <button class="btn btn-sm" style="margin-top:6px" data-act="add-set" data-e="${i}">+ Lap set</button>`;
 }
 
+function cruxBody(e, i) {
+  return `
+    <div class="section-label" style="margin-bottom:4px">Sets — each is one run through the crux</div>
+    ${setHead('grade', 'passes', 'finish', 'RPE')}
+    ${e.sets.map((s, si) => `
+      <div class="set-row">
+        <span class="set-num">${si + 1}</span>
+        <select data-e="${i}" data-s="${si}" data-f="grade" style="flex:1 1 86px">
+          <option value="">grade</option>
+          ${gradeScale('rope_endurance').map(g => `<option value="${g}"${s.grade === g ? ' selected' : ''}>${g}</option>`).join('')}
+        </select>
+        <input type="number" placeholder="passes" value="${esc(s.passes)}" data-e="${i}" data-s="${si}" data-f="passes">
+        <select data-e="${i}" data-s="${si}" data-f="outcome" style="flex:1 1 80px">
+          <option value="sent"${s.outcome === 'sent' ? ' selected' : ''}>sent</option>
+          <option value="fell"${s.outcome === 'fell' ? ' selected' : ''}>fell</option>
+        </select>
+        <input type="number" step="0.5" placeholder="RPE" value="${esc(s.rpe)}" data-e="${i}" data-s="${si}" data-f="rpe">
+        <button class="btn-danger" data-act="del-set" data-e="${i}" data-s="${si}">✕</button>
+      </div>`).join('')}
+    <button class="btn btn-sm" style="margin-top:6px" data-act="add-set" data-e="${i}">+ Set</button>`;
+}
+
 function boulderLapsBody(e, i) {
   return `
     <div class="section-label" style="margin-bottom:4px">Lap sets</div>
@@ -515,6 +551,11 @@ function renderAddPanel() {
   } else if (cat === 'finger') {
     picker = `<div class="chip-list">
       ${Object.entries(FINGER_PROTOCOLS).map(([v, l]) => `<button class="chip" data-act="add-finger" data-val="${v}">${l}</button>`).join('')}
+    </div>`;
+  } else if (cat === 'rope_endurance') {
+    picker = `<div class="chip-list">
+      ${Object.entries(ROPE_PROTOCOLS).map(([v, l]) =>
+        `<button class="chip" data-act="add-rope" data-val="${v}">${l}</button>`).join('')}
     </div>`;
   } else if (LAP_CATEGORIES.includes(cat)) {
     picker = `<div class="chip-list"><button class="chip" data-act="add-laps" data-val="${cat}">+ Add lap block</button></div>`;
@@ -602,6 +643,10 @@ function wireLog() {
           return;
         case 'add-climb':
           addEntry({ category: ds.val, name: '', grade: '', outcome: 'attempt', attempts: '1', notes: '' });
+          return;
+        case 'add-rope':
+          addEntry({ category: 'rope_endurance', protocol: ds.val,
+            sets: [ds.val === 'crux_intervals' ? cruxSet() : lapSet()] });
           return;
         case 'add-laps':
           addEntry({ category: ds.val,
