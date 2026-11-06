@@ -6,7 +6,7 @@ import { renderLog, newSession, loadDraft, primeRecall } from './log.js';
 import { loadHistory } from './history.js';
 import { renderProgress, invalidateProgressCache } from './progress.js';
 import { renderPyramidTab } from './pyramid.js';
-import { toast } from './utils.js';
+import { toast, esc } from './utils.js';
 
 const show = (id, on) => { document.getElementById(id).style.display = on ? (id === 'auth-screen' ? 'flex' : 'block') : 'none'; };
 
@@ -41,6 +41,18 @@ async function loadAutocompleteValues() {
     S.recentImplements = f.sort(newestFirst)
       .flatMap(e => (e.sets || []).map(s => s.implement)).filter(Boolean).slice(0, 50);
   } catch { S.recentClimbNames = []; S.recentImplements = []; }
+  paintDatalists();
+}
+
+// Autocomplete options live in the shell rather than in the form, so the Log
+// and Templates tabs don't each render a copy under the same id.
+function paintDatalists() {
+  const fill = (id, values) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = [...new Set(values || [])].map(v => `<option value="${esc(v)}">`).join('');
+  };
+  fill('climb-names', S.recentClimbNames);
+  fill('implements', S.recentImplements);
 }
 
 initAuth({
