@@ -6,6 +6,7 @@ import { renderLog, newSession, loadDraft, primeRecall } from './log.js';
 import { loadHistory } from './history.js';
 import { renderProgress, invalidateProgressCache } from './progress.js';
 import { renderPyramidTab } from './pyramid.js';
+import { renderTemplatesTab, loadTemplates } from './templates.js';
 import { toast, esc } from './utils.js';
 
 const show = (id, on) => { document.getElementById(id).style.display = on ? (id === 'auth-screen' ? 'flex' : 'block') : 'none'; };
@@ -22,6 +23,7 @@ function switchTab(name, btn) {
   if (name === 'progress') { invalidateProgressCache(); renderProgress(); }
   if (name === 'pyramid') renderPyramidTab();
   if (name === 'library') renderLibrary();
+  if (name === 'templates') renderTemplatesTab();
 }
 
 document.querySelectorAll('#tab-nav button').forEach(btn => {
@@ -69,6 +71,8 @@ initAuth({
     switchTab('log');
     primeRecall();
     loadAutocompleteValues();
+    // The Log tab's template picker reads these, so they load up front.
+    loadTemplates();
   },
   onSignedOut: () => {
     S.user = null;

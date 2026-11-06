@@ -30,6 +30,7 @@ const DB_STUB = `
 let exercises = [];
 let sessions = [];
 let entries = [];  // flat, each has sessionId
+let templates = [];
 let seq = 1;
 let clock = 1;
 const nid = () => 'id' + (seq++);
@@ -49,6 +50,11 @@ export async function createExercise(data) { const id = nid(); exercises.push({ 
 export async function updateExercise(id, data) { Object.assign(exercises.find(e=>e.id===id), data); }
 export async function deleteExercise(id) { exercises = exercises.filter(e=>e.id!==id); }
 // mirrors db.js: same-day sessions tie on date, so createdAt breaks it
+const copy = v => JSON.parse(JSON.stringify(v));
+export async function fetchTemplates() { return templates.map(t=>copy(t)).sort((a,b)=>a.name.localeCompare(b.name)); }
+export async function createTemplate(data) { const id = nid(); templates.push({ id, ...copy(data) }); return id; }
+export async function updateTemplate(id, data) { Object.assign(templates.find(t=>t.id===id), copy(data)); }
+export async function deleteTemplate(id) { templates = templates.filter(t=>t.id!==id); }
 export async function fetchSessions() {
   return sessions.map(s=>({...s}))
     .sort((a,b)=>b.date.localeCompare(a.date) || ((b.createdAt ?? 0) - (a.createdAt ?? 0)));
@@ -68,7 +74,6 @@ export async function saveSession(session) {
   session.entries.forEach((e, i) => entries.push({
     id: nid(), sessionId: id, ...e, uid: 'testuser', date: session.date, order: i, createdAt: clock++
   }));
-  window.__DB = { exercises, sessions, entries };
   return id;
 }
 export async function deleteSession(id) { sessions = sessions.filter(s=>s.id!==id); entries = entries.filter(e=>e.sessionId!==id); }
@@ -77,7 +82,8 @@ export async function fetchEntriesByCategory(category) {
   if (window.__FAIL_INDEX) {
     throw new Error('The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/x/firestore/indexes?create_composite=abc');
   } return entries.filter(e=>e.category===category).map(e=>({...e})).sort((a,b)=>a.date.localeCompare(b.date)); }
-window.__DB = { get exercises(){return exercises}, get sessions(){return sessions}, get entries(){return entries} };
+window.__DB = { get exercises(){return exercises}, get sessions(){return sessions},
+  get entries(){return entries}, get templates(){return templates} };
 `;
 
 const CHART_STUB = `
@@ -621,6 +627,148 @@ await step('cardio category switches form fields', async () => {
   if (!vis) throw new Error('cardio fields not shown');
 });
 
+console.log('\n--- TEMPLATES TAB ---');
+const tplTab = () => page.click('#tab-nav button[data-tab=templates]');
+await step('templates start empty', async () => {
+  await tplTab();
+  await page.waitForTimeout(300);
+  const txt = await page.locator('#tab-templates').innerText();
+  if (!txt.includes('No templates yet')) throw new Error('expected empty state, got: ' + txt.slice(0, 200));
+});
+await step('build a strength template, values and all', async () => {
+  await page.click('[data-tpl=new]');
+  await page.waitForTimeout(250);
+  await page.fill('#tpl-name', 'Strength Day A');
+  await page.locator('#tab-templates .chip', { hasText: 'Bench Press' }).click();
+  await page.waitForSelector('#tab-templates .entry-card[data-cat=sc]');
+  const rows = page.locator('#tab-templates .entry-card[data-cat=sc] .set-row');
+  if (await rows.count() !== 3) throw new Error('expected 3 default sets');
+  await rows.nth(0).locator('input[data-f=weight]').fill('185');
+  await rows.nth(0).locator('input[data-f=reps]').fill('5');
+  await page.click('#tpl-save');
+  await page.waitForTimeout(400);
+  const t = await page.evaluate(() => window.__DB.templates);
+  if (t.length !== 1) throw new Error('expected 1 template, got ' + t.length);
+  if (t[0].name !== 'Strength Day A') throw new Error('name wrong: ' + t[0].name);
+  if (t[0].entries.length !== 1) throw new Error('expected 1 entry');
+  if (t[0].entries[0].sets[0].weight !== '185') {
+    throw new Error('typed value should be stored: ' + JSON.stringify(t[0].entries[0].sets[0]));
+  }
+  if ('_localId' in t[0].entries[0]) throw new Error('_localId should not be stored');
+});
+await step('build a climbing template too', async () => {
+  await page.click('[data-tpl=new]');
+  await page.waitForTimeout(250);
+  await page.fill('#tpl-name', 'Boulder Laps PE');
+  await page.locator('#tab-templates .pill', { hasText: 'Boulder Laps' }).click();
+  await page.locator('#tab-templates .chip', { hasText: 'Add lap block' }).click();
+  await page.waitForSelector('#tab-templates .entry-card[data-cat=boulder_laps]');
+  const card = page.locator('#tab-templates .entry-card[data-cat=boulder_laps]');
+  await card.locator('select[data-f=grade]').first().selectOption('V4');
+  await card.locator('input[data-f=laps]').first().fill('4');
+  await page.click('#tpl-save');
+  await page.waitForTimeout(400);
+  const n = await page.evaluate(() => window.__DB.templates.length);
+  if (n !== 2) throw new Error('expected 2 templates, got ' + n);
+});
+await step('the editor offers no template picker of its own', async () => {
+  await page.click('[data-tpl=edit][data-id]');
+  await page.waitForTimeout(250);
+  const pills = await page.locator('#tab-templates .pill', { hasText: 'Templates' }).count();
+  await page.screenshot({ path: path.join(ROOT, 'test/screenshots/template-editor.png'), fullPage: true });
+  if (pills) throw new Error('template editor should not offer templates');
+  await page.click('#tpl-cancel');
+  await page.waitForTimeout(200);
+});
+await step('both templates land in one log — the double', async () => {
+  await page.click('#tab-nav button[data-tab=log]');
+  await page.waitForTimeout(300);
+  await page.locator('#tab-log .pill', { hasText: 'Templates' }).click();
+  await page.waitForTimeout(200);
+  await page.locator('#tab-log .chip', { hasText: 'Boulder Laps PE' }).click();
+  await page.waitForTimeout(250);
+  await page.locator('#tab-log .pill', { hasText: 'Templates' }).click();
+  await page.waitForTimeout(200);
+  await page.locator('#tab-log .chip', { hasText: 'Strength Day A' }).click();
+  await page.waitForTimeout(250);
+  const cards = page.locator('#tab-log .entry-card');
+  if (await cards.count() !== 2) throw new Error('expected 2 entries, got ' + await cards.count());
+  await page.setViewportSize({ width: 390, height: 1100 });
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: path.join(ROOT, 'test/screenshots/log-templates.png'), fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const cats = await page.$$eval('#tab-log .entry-card', els => els.map(e => e.dataset.cat));
+  if (cats.join(',') !== 'boulder_laps,sc') throw new Error('added out of order: ' + cats.join(','));
+});
+await step('inserted sets arrive pre-filled', async () => {
+  const w = await page.locator('#tab-log .entry-card[data-cat=sc] input[data-f=weight]').first().inputValue();
+  if (w !== '185') throw new Error('expected 185 pre-filled, got "' + w + '"');
+});
+await step('editing the log leaves the template alone', async () => {
+  await page.locator('#tab-log .entry-card[data-cat=sc] input[data-f=weight]').first().fill('205');
+  await page.waitForTimeout(300);
+  const stored = await page.evaluate(() =>
+    window.__DB.templates.find(t => t.name === 'Strength Day A').entries[0].sets[0].weight);
+  if (stored !== '185') throw new Error('template mutated by the log: ' + stored);
+});
+await step('a template saves as an ordinary session', async () => {
+  await page.click('#save-session-btn');
+  await page.waitForTimeout(500);
+  const n = await page.evaluate(() => window.__DB.sessions.length);
+  if (n !== 2) throw new Error('expected 2 sessions, got ' + n);
+  const e = await page.evaluate(() => window.__DB.entries.filter(x => x.sessionId === window.__DB.sessions[1].id));
+  if (e.length !== 2) throw new Error('expected 2 saved entries, got ' + e.length);
+  const sc = e.find(x => x.category === 'sc');
+  // the string typed into the form becomes a number on the way to the database
+  if (!sc || sc.sets[0].weight !== 205) {
+    throw new Error('sc weight not normalized: ' + JSON.stringify(sc && sc.sets[0]));
+  }
+  if (e.some(x => '_localId' in x)) throw new Error('_localId leaked into a saved entry');
+});
+await step('rename a template', async () => {
+  await tplTab();
+  await page.waitForTimeout(300);
+  await page.locator('.session-row', { hasText: 'Strength Day A' }).click();
+  await page.waitForTimeout(250);
+  await page.fill('#tpl-name', 'Strength Day A2');
+  await page.click('#tpl-save');
+  await page.waitForTimeout(400);
+  const names = await page.evaluate(() => window.__DB.templates.map(t => t.name));
+  if (!names.includes('Strength Day A2')) throw new Error('rename lost: ' + names.join(','));
+  if (names.length !== 2) throw new Error('rename should not add a template: ' + names.join(','));
+});
+await step('backing out of an edit discards the changes', async () => {
+  await page.locator('.session-row', { hasText: 'Boulder Laps PE' }).click();
+  await page.waitForTimeout(250);
+  await page.fill('#tpl-name', 'scratch');
+  await page.locator('#tab-templates .entry-card input[data-f=laps]').first().fill('99');
+  await page.click('#tpl-cancel');
+  await page.waitForTimeout(300);
+  const t = await page.evaluate(() => window.__DB.templates.find(x => x.name === 'Boulder Laps PE'));
+  if (!t) throw new Error('cancel renamed the stored template');
+  if (t.entries[0].sets[0].laps !== '4') throw new Error('cancel kept an edit: ' + t.entries[0].sets[0].laps);
+});
+await step('delete a template', async () => {
+  page.once('dialog', d => d.accept());
+  await page.locator('.session-row', { hasText: 'Strength Day A2' }).click();
+  await page.waitForTimeout(250);
+  await page.click('#tpl-del');
+  await page.waitForTimeout(400);
+  const names = await page.evaluate(() => window.__DB.templates.map(t => t.name));
+  if (names.includes('Strength Day A2')) throw new Error('not deleted: ' + names.join(','));
+});
+await step('six tabs still fit the phone nav', async () => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(250);
+  const clipped = await page.$$eval('#tab-nav button', els =>
+    els.filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent));
+  await page.screenshot({ path: 'test/screenshots/templates-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  if (clipped.length) throw new Error('tab labels clipped at 390px: ' + clipped.join(','));
+});
+
+await page.click('#tab-nav button[data-tab=library]');
+await page.waitForTimeout(300);
 await page.screenshot({ path: path.join(ROOT, 'test/screenshots/library.png') });
 await page.click('#tab-nav button[data-tab=log]');
 await page.waitForTimeout(300);

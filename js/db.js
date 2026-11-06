@@ -27,6 +27,32 @@ export function deleteExercise(id) {
   return deleteDoc(doc(db, `${uidPath()}/exercises/${id}`));
 }
 
+// ── Templates ────────────────────────────────────────────────
+// A session blueprint. Its entries are stored exactly as the form holds them —
+// strings in the boxes, blanks left blank — so adding one to a log is a copy
+// with no conversion in either direction. They are only ever read as a whole
+// template, never queried across, so they sit in the doc rather than in a
+// subcollection and need no index.
+export async function fetchTemplates() {
+  const snap = await getDocs(query(collection(db, `${uidPath()}/templates`), orderBy('name')));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function createTemplate(data) {
+  const ref = await addDoc(collection(db, `${uidPath()}/templates`), {
+    ...data, uid: S.user.uid, createdAt: serverTimestamp()
+  });
+  return ref.id;
+}
+
+export function updateTemplate(id, data) {
+  return updateDoc(doc(db, `${uidPath()}/templates/${id}`), { ...data, updatedAt: serverTimestamp() });
+}
+
+export function deleteTemplate(id) {
+  return deleteDoc(doc(db, `${uidPath()}/templates/${id}`));
+}
+
 // ── Sessions ─────────────────────────────────────────────────
 export async function fetchSessions(max = 200) {
   const snap = await getDocs(query(

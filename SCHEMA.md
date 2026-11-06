@@ -19,6 +19,26 @@ Finger training, bouldering and rope never reference this collection.
 }
 ```
 
+## users/{uid}/templates/{templateId}
+A prebuilt session. `entries` holds the same shapes a session's entries do, but
+exactly as the form keeps them — values as the strings that were typed, blanks
+left blank, unnormalized — so adding a template to a log is a copy with no
+conversion in either direction, and the entries normalize on the way to the
+database like any other. The form's `_localId` is stripped before saving, and
+fresh ones are handed out when a copy is made.
+
+```
+{
+  name: string,
+  entries: [ ...unnormalized entries... ],
+  createdAt, updatedAt
+}
+```
+
+Templates are only ever read whole, never queried across, so the entries sit in
+the document rather than in a subcollection — no subcollection, no index. The
+existing `users/{uid}/{document=**}` rule already covers them.
+
 ## users/{uid}/sessions/{sessionId}
 ```
 {
@@ -33,6 +53,26 @@ on the same day tie — Firestore would then order them by document ID, which is
 random for auto-IDs. `createdAt` (when the session was first saved) breaks the
 tie, applied client-side after the `date` query so it needs no composite index.
 Editing a session doesn't move it: the edit writes `updatedAt`, not `createdAt`.
+
+## users/{uid}/templates/{templateId}
+A prebuilt session. `entries` holds the same shapes a session's entries do, but
+exactly as the form keeps them — values as the strings that were typed, blanks
+left blank, unnormalized — so adding a template to a log is a copy with no
+conversion in either direction, and the entries normalize on the way to the
+database like any other. The form's `_localId` is stripped before saving, and
+fresh ones are handed out when a copy is made.
+
+```
+{
+  name: string,
+  entries: [ ...unnormalized entries... ],
+  createdAt, updatedAt
+}
+```
+
+Templates are only ever read whole, never queried across, so the entries sit in
+the document rather than in a subcollection — no subcollection, no index. The
+existing `users/{uid}/{document=**}` rule already covers them.
 
 ## users/{uid}/sessions/{sessionId}/entries/{entryId}
 One entry per exercise-block logged in a session, OR one entry per climb for

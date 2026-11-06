@@ -19,6 +19,8 @@ js/
   progress.js         Progress tab — charts
   pyramid.js          Pyramid tab — redpoint pyramid
   library.js          Library tab — S&C + cardio exercise CRUD
+  templates.js        Templates tab — prebuilt sessions
+  entryform.js        the entry cards + add picker, shared by Log and Templates
   format.js           shared entry → display-text formatting
   utils.js
 firestore.rules       security rules (deploy these!)
@@ -94,6 +96,14 @@ config. Screenshots land in `test/screenshots/`.
   fill. Nothing is pre-filled: what you lift today depends on the warm-up, so the panel
   informs the choice rather than making it. Logging only — editing an old session hides
   it, since the numbers are already known.
+- **Templates** are prebuilt sessions, for the ones you repeat. Build one in the
+  Templates tab — same form as logging — and it shows up under the Templates pill
+  in the Log tab's add panel. Tapping it drops its entries into whatever you're
+  already building, so two templates in one log gives you a double: climbing,
+  then strength, one session. Whatever you typed into the sets is saved with the
+  template and comes back pre-filled; leave a box blank to fill it in on the day.
+  Inserted entries are plain copies — edit or delete them freely, and nothing
+  you do in the log touches the template.
 - **Draft autosave** — the in-progress session is saved to `localStorage` on every
   keystroke, so a refresh or closing the tab won't lose it. It clears on save.
 - **Weights are absolute or relative.** An S&C set is either `lb` (absolute) or `BW±`,
